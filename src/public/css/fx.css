@@ -96,7 +96,7 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
 #home-leaderboard { box-shadow: var(--shadow-layered), 0 0 90px -20px rgba(109, 91, 255, 0.28); }
 
 /* ---------- Depth ---------- */
-.reward-card, .community-card, .stat-card, .race-card, .board-card, .kick-live-card, .promo-panel, .hero-visual, .support-card {
+.reward-card, .community-card, .stat-card, .payout-card, .race-card, .board-card, .kick-live-card, .promo-panel, .hero-visual, .support-card {
   box-shadow: var(--shadow-layered);
 }
 .reward-card.place-1 { box-shadow: var(--shadow-layered), 0 0 60px -10px rgba(246, 196, 69, 0.22); }
@@ -136,7 +136,7 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
   transition: transform 380ms var(--ease-spring), box-shadow 380ms var(--ease-out), border-color 260ms var(--ease-out), background 260ms var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
-  .reward-card:not(.reward-filler):hover, .community-card:hover, .stat-card:hover, .support-card:hover {
+  .reward-card:not(.reward-filler):hover, .community-card:hover, .stat-card:hover, .payout-card:hover, .support-card:hover {
     transform: translateY(-5px);
     box-shadow: var(--shadow-lifted);
     border-color: var(--border-hover);

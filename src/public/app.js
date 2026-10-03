@@ -567,9 +567,9 @@
     const prizePool = rewardFigure('currentPrizePool');
     const rewardsNote = state.rewards && (state.rewards.note || (state.rewards.updatedAt ? 'Figures updated ' + state.rewards.updatedAt + '.' : null));
     const payoutRows = [
-      { key: 'leaderboardPayout', label: 'Leaderboard payout' },
-      { key: 'levelUpBonus', label: 'Level up bonus' },
-      { key: 'socialMediaGiveaways', label: 'Social media giveaways' },
+      { key: 'leaderboardPayout', label: 'Leaderboard payout', hint: 'Paid from the wager race.', sticker: 'trophy' },
+      { key: 'levelUpBonus', label: 'Level up bonus', hint: 'Paid for level-up rewards.', sticker: 'star' },
+      { key: 'socialMediaGiveaways', label: 'Social giveaways', hint: 'Paid on social channels.', sticker: 'gift' },
     ];
     const race = c.race || { title: 'Wager Race', top: 10 };
     const copyMsg = h('span', { class: 'muted', role: 'status' });
@@ -648,21 +648,18 @@
             h('strong', { class: 'reward-amount' }, usd0(c.prizes[rank])),
             h('p', { class: 'muted' }, 'Paid to rank ' + rank + ' on the wager leaderboard.'))),
           rewardFiller(prizeRanks.length + (prizeRanks.includes(1) ? 1 : 0))) : null,
-        h('div', { class: 'board-card payout-board' },
-          h('div', { class: 'section-head' },
-            h('div', {},
-              h('span', { class: 'eyebrow' }, 'Given so far'),
-              h('h2', {}, 'Bonuses given'),
-              h('p', { class: 'muted' }, 'Amounts published by the Norochan team. A dash means that figure has not been set yet.'))),
-          h('div', { class: 'leaderboard-list', role: 'list', 'aria-label': 'Bonuses given' },
-            h('div', { class: 'leaderboard-row leaderboard-head payout-row', role: 'presentation' },
-              h('span', {}, 'Bonus'),
-              h('span', { class: 'leaderboard-prize' }, 'Amount')),
-            payoutRows.map((row, index) => {
+        h('div', { class: 'payout-board' },
+          h('p', { class: 'payout-kicker' }, 'Given so far'),
+          h('h3', { class: 'payout-title' }, 'Bonuses given'),
+          h('p', { class: 'muted payout-lead' }, 'Published by the Norochan team. A dash means that total has not been set yet.'),
+          h('div', { class: 'payout-grid', role: 'list', 'aria-label': 'Bonuses given' },
+            payoutRows.map((row) => {
               const amount = rewardFigure(row.key);
-              return h('div', { class: 'leaderboard-row payout-row' + (index === 0 ? ' top3 rank-1' : ''), role: 'listitem' },
-                h('span', { class: 'leaderboard-name' }, row.label),
-                h('span', { class: 'leaderboard-prize' }, amount != null ? usd0(amount) : '—'));
+              return h('article', { class: 'payout-card', role: 'listitem' },
+                sticker(row.sticker, 'payout-sticker'),
+                h('span', { class: 'payout-label' }, row.label),
+                h('strong', { class: 'payout-amount' }, amount != null ? usd0(amount) : '—'),
+                h('p', { class: 'muted' }, row.hint));
             })))),
       h('section', { id: 'community', class: 'section-block', 'data-spy': 'community' },
         h('div', { class: 'section-head' },
@@ -854,7 +851,7 @@
   const progressBar = h('div', { class: 'scroll-progress', 'aria-hidden': 'true' });
   document.body.append(progressBar);
 
-  const revealSelector = '.hero-copy, .hero-visual, .stat-card, .promo-panel, .race-card, .section-head, .reward-card, .board-card, .payout-board, .kick-live-card, .community-card, .page-intro, .support-card';
+  const revealSelector = '.hero-copy, .hero-visual, .stat-card, .promo-panel, .race-card, .section-head, .reward-card, .board-card, .payout-board, .payout-card, .kick-live-card, .community-card, .page-intro, .support-card';
   let revealObserver = null;
   function initReveal() {
     if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -878,7 +875,7 @@
   }
 
   // Cursor-following light on cards and a small parallax on the hero stickers (mouse only).
-  const spotSelector = '.stat-card, .community-card, .reward-card, .race-card, .promo-panel, .board-card, .kick-live-card, .hero-visual, .support-card';
+  const spotSelector = '.stat-card, .community-card, .reward-card, .payout-card, .race-card, .promo-panel, .board-card, .kick-live-card, .hero-visual, .support-card';
   if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
     let parallaxCard = null;
     document.addEventListener('pointermove', (event) => {
