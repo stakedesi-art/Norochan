@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Norochan stake affiliate site">
+    <title>Norochan</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#app">Skip to content</a>
+
+    <header class="site-header" aria-label="Main navigation">
+      <div class="header-inner">
+        <a class="brand" href="#/">
+          <span class="brand-mark" aria-hidden="true"></span>
+          Norochan
+        </a>
+        <nav class="site-nav" aria-label="Site navigation">
+          <a href="#/" data-route="home">Dashboard</a>
+          <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
+          <a href="#/account" id="nav-account" data-route="account">Log in</a>
+        </nav>
+        <div class="header-actions">
+          <button id="theme" class="icon-btn theme-desktop" type="button" aria-label="Toggle color theme">Theme</button>
+          <button id="nav-toggle" class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu">☰</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="mobile-nav" class="mobile-nav" aria-hidden="true">
+      <div class="mobile-nav-panel" role="dialog" aria-modal="true" aria-label="Navigation menu">
+        <button type="button" class="mobile-nav-close" id="mobile-nav-close" aria-label="Close menu">×</button>
+        <p class="mobile-nav-title">Navigation</p>
+        <div class="mobile-nav-links">
+          <a href="#/" data-route="home">Dashboard</a>
+          <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
+          <a href="#/account" data-route="account">Account</a>
+          <button id="theme-mobile" class="icon-btn" type="button" style="margin-top:12px;width:100%">Toggle theme</button>
+        </div>
+      </div>
+    </div>
+
+    <main id="app" tabindex="-1" aria-live="polite"></main>
+
+    <footer class="site-footer" aria-label="Footer">
+      <div class="footer-brand">
+        <div class="brand-lockup">
+          <span class="brand-mark">NOROCHAN</span>
+        </div>
+        <p class="footer-copy">Exclusive VIP rewards and top casino bonuses on Stake.com. 18+ Only, Not For Indian Audience.</p>
+      </div>
+
+      <div class="footer-gambling">
+        <h3>Responsible gambling</h3>
+        <p>Gambling can be addictive and may lead to serious financial problems. If you or someone you know is struggling with gambling addiction, please seek help.</p>
+        <div class="help-line">
+          <span>24/7 Problem Gambling Helpline:</span>
+          <strong>1-800-522-4700</strong>
+          <span>National Council on Problem Gambling</span>
+        </div>
+      </div>
+
+      <div class="footer-connect">
+        <h3>Connect</h3>
+        <div class="social-pills" aria-label="Social links">
+          <a href="https://discord.gg/32Ww7KZQXq" aria-label="Discord" title="Discord">D</a>
+          <a href="https://x.com/Norochanplay" aria-label="X" title="X">X</a>
+          <a href="https://kick.com/norochan" aria-label="Kick" title="Kick">K</a>
+        </div>
+        <a class="footer-cta" href="#/leaderboard">Compete on the leaderboard</a>
+      </div>
+    </footer>
+
+    <div class="footer-bottom-bar">
+      <span>© 2026 norochan.com · All rights reserved</span>
+    </div>
+
+    <script src="/ui.js" defer></script>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "norochan-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Norochan Stake affiliate site: wager race leaderboard + accounts",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node server.js",
+    "mock": "node test/mock-stake.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": { "node": ">=18" }
+}
