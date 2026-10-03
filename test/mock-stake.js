@@ -24,12 +24,6 @@ function leaderboardCsv(limit) {
   });
   return lines.join('\n') + '\n';
 }
-function referredCsv() {
-  const rows = ['user,campaign_code,created_at'];
-  for (const u of ['Alice_W', 'user7', 'newbie_1']) rows.push(`${u},Norochan,2026-09-30T10:00:00Z`);
-  return rows.join('\r\n') + '\r\n';
-}
-
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const send = (code, body, type = 'text/csv') => { res.writeHead(code, { 'Content-Type': type }); res.end(body); };
@@ -46,9 +40,6 @@ http.createServer((req, res) => {
     }
     if (q.get('timePeriod') !== 'customRange') return send(400, 'timePeriod must be currentMonth or customRange', 'text/plain');
     return send(200, leaderboardCsv(Math.min(Number(q.get('limit')) || 100, 100)));
-  }
-  if (url.pathname === '/referred-users') {
-    return send(200, referredCsv());
   }
   return send(404, 'not found', 'text/plain');
 }).listen(PORT, '127.0.0.1', () => console.log(`Mock Stake API on http://127.0.0.1:${PORT}`));

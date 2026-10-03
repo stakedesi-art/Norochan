@@ -1,0 +1,31 @@
+[Unit]
+Description=Norochan site (Node.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=norochan
+Group=norochan
+WorkingDirectory=/opt/norochan
+EnvironmentFile=/etc/norochan/norochan.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+# Hardening: the app may only write to its data directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/norochan
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

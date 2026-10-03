@@ -1,0 +1,253 @@
+/* Decorative stickers and light background art. Stickers: Microsoft Fluent Emoji 3D (MIT, see /img/stickers/LICENSE.txt). */
+
+:root {
+  --decor-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.55' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M24 14l6 8-6 8-6-8z'/%3E%3Ccircle cx='72' cy='66' r='5'/%3E%3Cpath d='M70 16v8M66 20h8'/%3E%3Cpath d='M20 68l6 6m0-6l-6 6'/%3E%3C/g%3E%3C/svg%3E");
+  --sticker-shadow: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.45));
+}
+:root[data-theme="light"] {
+  --decor-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%236d5bff' stroke-opacity='.5' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M24 14l6 8-6 8-6-8z'/%3E%3Ccircle cx='72' cy='66' r='5'/%3E%3Cpath d='M70 16v8M66 20h8'/%3E%3Cpath d='M20 68l6 6m0-6l-6 6'/%3E%3C/g%3E%3C/svg%3E");
+  --sticker-shadow: drop-shadow(0 10px 14px rgba(40, 30, 90, 0.22));
+}
+
+/* ---------- Shared ---------- */
+.decor {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.decor::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--decor-pattern);
+  background-size: 96px 96px;
+  opacity: 0.07;
+  -webkit-mask-image: radial-gradient(closest-side at 70% 30%, #000, transparent);
+  mask-image: radial-gradient(closest-side at 70% 30%, #000, transparent);
+}
+.sticker {
+  position: absolute;
+  display: block;
+  height: auto;
+  user-select: none;
+  filter: var(--sticker-shadow);
+  animation: sticker-float 6s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+  transform: rotate(var(--r, 0deg));
+}
+@keyframes sticker-float {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-10px) rotate(calc(var(--r, 0deg) + 4deg)); }
+}
+@keyframes sticker-twinkle {
+  0%, 100% { opacity: 0.55; transform: scale(0.85) rotate(var(--r, 0deg)); }
+  50% { opacity: 1; transform: scale(1.08) rotate(var(--r, 0deg)); }
+}
+.hero-visual > :not(.decor),
+.promo-panel > :not(.decor),
+.race-card > :not(.decor),
+.reward-card > :not(.decor):not(.reward-sticker) { position: relative; z-index: 1; }
+.hero-visual, .promo-panel, .race-card, .reward-card { position: relative; overflow: hidden; isolation: isolate; }
+.hero-visual > .eyebrow, .promo-panel > .eyebrow { align-self: flex-start; }
+.hero-visual { padding-top: 236px; }
+
+.community-card .social-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  font-weight: 700;
+  transition: transform 220ms var(--ease-out);
+}
+.community-card:hover .social-icon { transform: rotate(-6deg) scale(1.06); }
+
+/* ---------- Hero creator card ---------- */
+.decor-hero::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 110px;
+  width: 260px;
+  height: 260px;
+  margin-left: -130px;
+  margin-top: -130px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(246, 196, 69, 0.22), rgba(109, 91, 255, 0.12) 55%, transparent);
+}
+.decor-hero .sticker { z-index: 1; }
+.decor-hero .s-main { width: 170px; top: 30px; left: calc(50% - 85px); --d: -1s; }
+.decor-hero .s-crown { width: 72px; top: 24px; left: 22px; --r: -16deg; --d: -2.5s; }
+.decor-hero .s-coin1 { width: 52px; top: 158px; left: 34px; --r: 12deg; --d: -4s; animation-duration: 5s; }
+.decor-hero .s-coin2 { width: 38px; top: 40px; right: 36px; --r: -10deg; --d: -0.5s; animation-duration: 4.5s; }
+.decor-hero .s-die { width: 62px; top: 150px; right: 30px; --r: 14deg; --d: -3s; animation-duration: 7s; }
+.decor-hero .s-spark { width: 44px; top: 16px; right: 96px; animation: sticker-twinkle 2.8s ease-in-out infinite; }
+
+/* ---------- Promo / code panel ---------- */
+.decor-promo::before { -webkit-mask-image: radial-gradient(closest-side at 90% 10%, #000, transparent); mask-image: radial-gradient(closest-side at 90% 10%, #000, transparent); opacity: 0.09; }
+.decor-promo .s-bag { width: 104px; top: 16px; right: 26px; --r: 8deg; }
+.decor-promo .s-coin { width: 40px; top: 98px; right: 120px; --r: -14deg; --d: -2s; animation-duration: 5s; }
+.decor-promo .s-bill { width: 58px; top: 12px; right: 132px; --r: -22deg; --d: -3.5s; animation-duration: 7s; opacity: 0.9; }
+
+/* ---------- Race window card ---------- */
+.dashboard-grid > .race-card { align-self: stretch; }
+.decor-race::before { -webkit-mask-image: radial-gradient(closest-side at 85% 90%, #000, transparent); mask-image: radial-gradient(closest-side at 85% 90%, #000, transparent); }
+.decor-race .s-trophy { width: 96px; right: 20px; bottom: 16px; --r: 6deg; }
+.decor-race .s-glass { width: 46px; right: 118px; bottom: 22px; --r: -12deg; --d: -2s; animation-duration: 5s; }
+.decor-race .s-star { width: 34px; right: 18px; bottom: 116px; animation: sticker-twinkle 3.2s ease-in-out infinite; }
+
+/* ---------- Reward cards ---------- */
+.reward-sticker {
+  width: 64px;
+  top: 16px;
+  right: 16px;
+  z-index: 0;
+  opacity: 0.95;
+  --r: 8deg;
+  transition: filter 220ms var(--ease-out);
+}
+.reward-card:nth-child(2n) .reward-sticker { --d: -2s; --r: -8deg; }
+.reward-card:nth-child(3n) .reward-sticker { --d: -4s; }
+.reward-card.place-1 .reward-sticker { width: 132px; top: 50%; right: 28px; margin-top: -66px; --r: 6deg; }
+.reward-card:hover .reward-sticker { filter: var(--sticker-shadow) brightness(1.08) saturate(1.1); }
+.reward-card.place-1::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--decor-pattern);
+  background-size: 96px 96px;
+  opacity: 0.08;
+  -webkit-mask-image: radial-gradient(closest-side at 85% 50%, #000, transparent);
+  mask-image: radial-gradient(closest-side at 85% 50%, #000, transparent);
+}
+
+.reward-card.reward-filler {
+  display: none;
+  justify-content: flex-end;
+  border-style: dashed;
+  border-color: rgba(246, 196, 69, 0.28);
+  background:
+    radial-gradient(360px 200px at 70% 30%, rgba(246, 196, 69, 0.1), transparent 70%),
+    radial-gradient(300px 200px at 20% 100%, rgba(109, 91, 255, 0.14), transparent 70%),
+    var(--bg-surface);
+}
+.reward-card.reward-filler:hover { transform: none; }
+.decor-filler .s-gift { width: 92px; top: 18px; right: 28px; --r: 8deg; }
+.decor-filler .s-party { width: 70px; top: 22px; right: 140px; --r: -14deg; --d: -2s; animation-duration: 5s; }
+.decor-filler .s-die { width: 48px; top: 96px; right: 120px; --r: 18deg; --d: -3s; animation-duration: 7s; }
+.decor-filler .s-coin { width: 36px; top: 20px; right: 230px; --r: -10deg; --d: -1s; animation-duration: 4.5s; }
+.decor-filler .s-spark { width: 38px; top: 104px; right: 24px; animation: sticker-twinkle 2.6s ease-in-out infinite; }
+@media (min-width: 1024px) {
+  .reward-card.reward-filler.fill-lg-1 { display: flex; grid-column: span 1; }
+  .reward-card.reward-filler.fill-lg-2 { display: flex; grid-column: span 2; }
+  .reward-card.reward-filler.fill-lg-1 .s-coin { display: none; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .reward-card.reward-filler.fill-md-1 { display: flex; grid-column: span 1; }
+  .reward-card.reward-filler.fill-md-1 .s-coin { display: none; }
+}
+
+/* ---------- Section heads get a floating sticker on the empty right side ---------- */
+.section-head::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  background: center / contain no-repeat;
+  filter: var(--sticker-shadow);
+  animation: sticker-float 6s ease-in-out infinite;
+  --r: 8deg;
+}
+#rewards .section-head::after { background-image: url("/img/stickers/gift.png"); }
+#streams .section-head::after { background-image: url("/img/stickers/video-camera.png"); --r: -8deg; animation-delay: -2s; }
+#community .section-head::after { background-image: url("/img/stickers/speech.png"); animation-delay: -4s; }
+
+/* ---------- Leaderboard page title ---------- */
+.leaderboard-page .page-intro { position: relative; }
+.leaderboard-page .page-intro::before,
+.leaderboard-page .page-intro::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  width: 76px;
+  height: 76px;
+  background: center / contain no-repeat;
+  filter: var(--sticker-shadow);
+  pointer-events: none;
+  animation: sticker-float 6s ease-in-out infinite;
+}
+.leaderboard-page .page-intro::before { left: -120px; background-image: url("/img/stickers/trophy.png"); --r: -10deg; }
+.leaderboard-page .page-intro::after { right: -120px; background-image: url("/img/stickers/crown.png"); --r: 12deg; animation-delay: -3s; }
+
+/* ---------- Empty and error states ---------- */
+.ui-empty-mark {
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 0;
+  background: url("/img/stickers/die.png") center / contain no-repeat;
+  filter: var(--sticker-shadow);
+  animation: sticker-float 6s ease-in-out infinite;
+}
+[aria-labelledby="kick-viewers-heading"] .ui-empty-mark { background-image: url("/img/stickers/satellite.png"); }
+.ui-empty, .ui-error { position: relative; overflow: hidden; }
+.ui-empty::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--decor-pattern);
+  background-size: 96px 96px;
+  opacity: 0.06;
+  -webkit-mask-image: radial-gradient(closest-side, #000, transparent);
+  mask-image: radial-gradient(closest-side, #000, transparent);
+}
+.ui-empty > *, .ui-error > * { position: relative; }
+.ui-error::before {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto var(--space-3);
+  background: url("/img/stickers/hourglass.png") center / contain no-repeat;
+  filter: var(--sticker-shadow);
+  animation: sticker-float 6s ease-in-out infinite;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1023px) {
+  .leaderboard-page .page-intro::before,
+  .leaderboard-page .page-intro::after { display: none; }
+}
+@media (max-width: 767px) {
+  .hero-visual { min-height: 400px; padding-top: 170px; }
+  .decor-hero::after { top: 86px; width: 200px; height: 200px; margin-left: -100px; margin-top: -100px; }
+  .decor-hero .s-main { width: 128px; top: 20px; left: calc(50% - 64px); }
+  .decor-hero .s-crown { width: 54px; top: 18px; left: 16px; }
+  .decor-hero .s-coin1 { width: 36px; top: 92px; left: 30px; }
+  .decor-hero .s-coin2 { width: 30px; top: 30px; right: 26px; }
+  .decor-hero .s-die { width: 46px; top: 106px; right: 22px; }
+  .decor-hero .s-spark { width: 34px; top: 10px; right: 70px; }
+  .decor-promo .s-bag { width: 72px; top: 14px; right: 14px; }
+  .decor-promo .s-coin, .decor-promo .s-bill { display: none; }
+  .decor-race .s-trophy { width: 56px; right: 14px; bottom: 14px; }
+  .decor-race .s-glass, .decor-race .s-star { display: none; }
+  .reward-sticker { width: 52px; }
+  .reward-card.place-1 .reward-sticker { width: 64px; top: 16px; margin-top: 0; right: 16px; }
+  .section-head::after { width: 48px; height: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticker, .section-head::after, .leaderboard-page .page-intro::before, .leaderboard-page .page-intro::after,
+  .ui-empty-mark, .ui-error::before { animation: none; }
+}

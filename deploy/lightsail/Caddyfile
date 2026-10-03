@@ -1,0 +1,11 @@
+# Caddy gets and renews the HTTPS certificate automatically.
+# setup.sh replaces example.com with your domain; point its DNS A record at the Lightsail static IP first.
+example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+}
+
+# Uncomment once a www DNS record also points at the instance:
+# www.example.com {
+# 	redir https://example.com{uri} permanent
+# }

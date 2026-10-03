@@ -1,4 +1,7 @@
 data.json
 data.json.tmp
+data.json.pre-*.bak
+src/data/rewards.json
 .env
 node_modules
+src/data/*.csv

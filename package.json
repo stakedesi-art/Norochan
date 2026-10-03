@@ -2,12 +2,14 @@
   "name": "norochan-site",
   "version": "1.0.0",
   "private": true,
-  "description": "Norochan Stake affiliate site: wager race leaderboard + accounts",
+  "description": "Norochan Stake affiliate site: Kick live status, wager race, and top viewers",
   "main": "src/server.js",
   "scripts": {
     "start": "node server.js",
     "mock": "node test/mock-stake.js",
-    "test": "node test/smoke.js"
+    "test": "node test/smoke.js",
+    "debug:stake": "node scripts/debug-stake.js",
+    "migrate": "node scripts/migrations/001-remove-accounts.js"
   },
   "engines": { "node": ">=18" }
 }
