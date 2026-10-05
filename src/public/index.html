@@ -4,12 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Norochan stake affiliate site">
-    <meta name="theme-color" content="#101019">
+    <meta name="theme-color" content="#0a1418">
     <title>Norochan</title>
+    <link rel="icon" href="/img/norochan-logo.png" type="image/png">
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/decor.css">
     <link rel="stylesheet" href="/css/fx.css">
+    <link rel="stylesheet" href="/css/identity.css">
   </head>
   <body>
     <a class="skip-link" href="#app">Skip to content</a>
@@ -17,32 +19,23 @@
     <header class="site-header">
       <div class="header-inner">
         <a class="brand" href="#/">
-          <span class="brand-mark" aria-hidden="true">N</span>
+          <img class="brand-mark" src="/img/norochan-logo.png" alt="" width="40" height="40">
           <span class="brand-name">Norochan</span>
         </a>
         <nav class="site-nav" aria-label="Site navigation">
           <a href="#/" data-route="home">Home</a>
-          <a href="#/streams" data-route="streams">Streams</a>
           <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
-          <a href="#/rewards" data-route="rewards">Rewards</a>
+          <a href="#/wheel" data-route="wheel">Wheel</a>
+          <a href="#/benefits" data-route="benefits">Code benefits</a>
+          <a href="#/announcements" data-route="announcements">Announcement</a>
           <a href="#/community" data-route="community">Community</a>
           <a href="#/support" data-route="support">Support</a>
         </nav>
         <div class="header-actions">
-          <a id="nav-live" class="nav-live" href="https://kick.com/norochan" target="_blank" rel="noopener noreferrer" hidden>
-            <span class="nav-live-dot" aria-hidden="true"></span>
-            <span class="nav-live-label">Kick</span>
+          <a id="nav-account" class="nav-account" href="#/account" data-route="account">
+            <span class="nav-account-mark" aria-hidden="true">A</span>
+            <span class="nav-account-name">Account</span>
           </a>
-          <a id="nav-discord" class="nav-social" href="https://discord.gg/32Ww7KZQXq" target="_blank" rel="noopener noreferrer">Discord</a>
-          <button id="theme" class="icon-btn theme-desktop" type="button" aria-label="Switch to light theme" data-tooltip="Appearance">
-            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-              <circle cx="12" cy="12" r="4"></circle>
-              <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"></path>
-            </svg>
-            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-              <path d="M20 14.5A7.5 7.5 0 0 1 9.5 4 7 7 0 1 0 20 14.5z"></path>
-            </svg>
-          </button>
           <button id="nav-toggle" class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu">
             <span class="nav-toggle-bars"></span>
           </button>
@@ -56,22 +49,14 @@
         <p class="mobile-nav-title">Navigation</p>
         <div class="mobile-nav-links">
           <a href="#/" data-route="home">Home</a>
-          <a href="#/streams" data-route="streams">Streams</a>
           <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
-          <a href="#/rewards" data-route="rewards">Rewards</a>
+          <a href="#/wheel" data-route="wheel">Wheel</a>
+          <a href="#/benefits" data-route="benefits">Code benefits</a>
+          <a href="#/announcements" data-route="announcements">Announcement</a>
           <a href="#/community" data-route="community">Community</a>
           <a href="#/support" data-route="support">Support</a>
+          <a href="#/account" data-route="account">Account</a>
         </div>
-        <button id="theme-mobile" class="icon-btn theme-mobile" type="button">
-          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"></path>
-          </svg>
-          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path d="M20 14.5A7.5 7.5 0 0 1 9.5 4 7 7 0 1 0 20 14.5z"></path>
-          </svg>
-          <span class="theme-mobile-label">Appearance</span>
-        </button>
       </div>
     </div>
 
@@ -103,11 +88,13 @@
         </div>
         <nav class="footer-nav" aria-label="Footer">
           <a href="#/">Home</a>
-          <a href="#/streams">Streams</a>
           <a href="#/leaderboard">Leaderboard</a>
-          <a href="#/rewards">Rewards</a>
+          <a href="#/wheel">Wheel</a>
+          <a href="#/benefits">Code benefits</a>
+          <a href="#/announcements">Announcement</a>
           <a href="#/community">Community</a>
           <a href="#/support">Support</a>
+          <a href="#/account">Account</a>
         </nav>
         <a class="footer-cta" href="#/leaderboard">Compete on the leaderboard</a>
       </div>

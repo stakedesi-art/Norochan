@@ -12,6 +12,7 @@ const path = require('path');
 
 const ID = '001-remove-accounts';
 const RETIRED_KEYS = ['users', 'sessions', 'auditLog'];
+// Phase 3 stores visitor rows in `accounts` / `visitorSessions` / `magicLinks`. Never add those here.
 const dataFile = process.env.DATA_FILE || path.join(__dirname, '..', '..', 'src', 'data.json');
 const dryRun = process.argv.includes('--dry-run');
 

@@ -1,6 +1,24 @@
 {
   "currency": "USD",
   "currentPrizePool": 500,
+  "viewerPrizePool": null,
+  "racePrizes": {
+    "1": 200,
+    "2": 100,
+    "3": 60,
+    "4": 40,
+    "5": 30,
+    "6": 20,
+    "7": 15,
+    "8": 15,
+    "9": 10,
+    "10": 10
+  },
+  "viewerRewards": {
+    "1": null,
+    "2": null,
+    "3": null
+  },
   "leaderboardPayout": null,
   "levelUpBonus": null,
   "socialMediaGiveaways": null,

@@ -1,12 +1,12 @@
 'use strict';
 // The BotRix "Top viewers" board instance shared by the API routes and the startup code.
-const { CONFIG, KICK_CHANNEL } = require('../config');
+const { KICK_CHANNEL } = require('../config');
 const { BotrixLeaderboardService } = require('./botrix');
+const { viewerRewardFor } = require('./rewards');
 
 const VIEWER_TRACKING_UNSUPPORTED =
-  'The official KICK API has no per-viewer watch-time data, and the BotRix leaderboard is not connected yet. ' +
-  'Set BOTRIX_LEADERBOARD_URL to the endpoint issued by BotRix support to enable the Top viewers board.';
+  'The official KICK API has no per-viewer watch-time data, and the BotRix leaderboard is turned off. ' +
+  'Set BOTRIX_LEADERBOARD_URL for an issued BotRix endpoint, or leave the public leaderboard fetch enabled.';
 const botrix = new BotrixLeaderboardService({ channel: KICK_CHANNEL });
-const viewerRewardFor = (rank) => (CONFIG.viewerRewards && CONFIG.viewerRewards[rank] != null ? CONFIG.viewerRewards[rank] : null);
 
 module.exports = { botrix, VIEWER_TRACKING_UNSUPPORTED, viewerRewardFor };

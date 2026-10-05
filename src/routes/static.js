@@ -7,7 +7,7 @@ const { SEC_HEADERS, sendJson } = require('../lib/http');
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.json': 'application/json',
   '.woff2': 'font/woff2',
 };
 function serveStatic(req, res, url) {
@@ -19,7 +19,11 @@ function serveStatic(req, res, url) {
   fs.readFile(file, (err, data) => {
     if (err) return sendJson(res, 404, { error: 'Not found.' });
     const headers = { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', ...SEC_HEADERS };
-    if (HSTS) headers['Strict-Transport-Security'] = 'max-age=31536000';
+    if (HSTS) headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+    if (/(?:^|\/)studio\.(html|js)$/.test(rel) || rel === '/css/studio.css') {
+      headers['Cache-Control'] = 'no-store';
+      headers['X-Robots-Tag'] = 'noindex, nofollow';
+    }
     res.writeHead(200, headers);
     res.end(req.method === 'HEAD' ? undefined : data);
   });

@@ -65,14 +65,17 @@ docs/                  design notes, AWS_DEPLOYMENT.md, AUTH_REMOVAL_REPORT.md
 | `REWARDS_FILE` | `src/data/rewards.json` | Public prize pool and total bonuses (edit this file; no admin UI) |
 | `REFRESH_MS` | `3600000` | Stake refresh interval |
 | `KICK_CHANNEL_USERNAME` | `norochan` | Public Kick channel for live/offline status |
-| `BOTRIX_LEADERBOARD_URL` | none | BotRix leaderboard endpoint (enables Top viewers) |
-| `BOTRIX_API_KEY` / `BOTRIX_API_KEY_HEADER` | none / `Authorization` | Key from BotRix, if they issue one |
-| `BOTRIX_WATCHTIME_UNIT` | none | `seconds`, `minutes` or `hours`; empty hides watch time |
+| `KICK_CLIENT_ID` / `KICK_CLIENT_SECRET` | none | Kick OAuth. Enables **Connect Kick** on Account and Kick sign-in |
+| `KICK_REDIRECT_URI` | `{BASE_URL}/auth/kick/callback` | Must match a redirect URL in the Kick developer app. Localhost uses `http://localhost:PORT/auth/kick/callback` automatically |
+| `BOTRIX_LEADERBOARD_URL` | none | Optional issued BotRix JSON endpoint. If unset, the public leaderboard page is fetched server-side |
+| `BOTRIX_API_KEY` / `BOTRIX_API_KEY_HEADER` | none / `Authorization` | Key from BotRix, if they issue one. Server-side only |
+| `BOTRIX_PUBLIC` / `BOTRIX_PUBLIC_URL` | `1` / `https://botrix.live/k/{channel}/leaderboard` | Public page fallback. Set `BOTRIX_PUBLIC=0` to disable |
+| `BOTRIX_WATCHTIME_UNIT` | `minutes` on public fallback, else none | `seconds`, `minutes` or `hours`; empty hides numeric watch time from JSON |
 | `BOTRIX_TOP` / `BOTRIX_SYNC_MS` | `10` / `900000` | Rows shown / sync interval (min 5 min) |
 
 All variables are listed with placeholders in `.env.example`.
 
-There is no visitor login, signup, or admin panel. Prize pool and bonus figures come from `REWARDS_FILE` (copy `src/data/rewards.example.json`). If an old `data.json` still has `users` / `sessions` / `auditLog`, stop the site and run `npm run migrate`. See `docs/AUTH_REMOVAL_REPORT.md`.
+There is no public Admin panel. Visitors sign in from **Account** with email + password (Google/Kick if those env vars are set). After email signup a confirmation link is sent via Gmail (`GMAIL_USER` + `GMAIL_APP_PASSWORD`). They can **Connect Kick** on Account (same Kick app credentials). They type their Stake username and pick a referral code; norochan / divu / ipl2026 / deepu wait for staff, any other code is stored as not under code. Studio **Users** lists email, Stake username, code status (Verified / Not under code), and Kick username. Prize pool figures still come from `REWARDS_FILE`. If an old `data.json` still has `users` / `sessions` / `auditLog`, stop the site and run `npm run migrate` — that cleanup does not delete Phase 3 `accounts`.
 
 ## Prize pool and bonuses
 Copy `src/data/rewards.example.json` to `src/data/rewards.json` (or the `REWARDS_FILE` path on the server) and fill in:
@@ -92,16 +95,17 @@ Copy `src/data/rewards.example.json` to `src/data/rewards.json` (or the `REWARDS
 `currentPrizePool` is the figure on the Rewards header. The three payout fields appear in the “Bonuses given” list at the bottom of that section. Leave a number `null` to show a dash. The site re-reads the file when it changes, so no restart is needed. There is no dashboard for this.
 
 ## BotRix Top viewers leaderboard
-The "Top viewers" card on the leaderboard page ranks Kick viewers by BotRix watch time, with Current month / Previous month tabs. Full research and design: `docs/BOTRIX_INTEGRATION_PLAN.md`.
+The "Top viewers" card ranks Kick viewers by BotRix watch time. Current standings come from BotRix; previous month is a snapshot the site froze at month end. BotRix itself does not publish a history endpoint.
 
 **Setup**
-1. Join the BotRix Discord (https://discord.gg/aphsbfD) and ask in the public support channel for the public leaderboard endpoint for your Kick channel. Ask which header the key goes in (if any), the watch-time unit, and how often you may poll.
-2. Set `BOTRIX_LEADERBOARD_URL` (and `BOTRIX_API_KEY`, `BOTRIX_WATCHTIME_UNIT` if applicable) in the environment, then restart. The terminal prints `BotRix leaderboard: on, sync every 15 min`.
-3. Reset BotRix rankings at the start of each month. BotRix totals are cumulative, so this keeps "Current month" accurate. The site saves the final standings of each month automatically as "Previous month".
+1. Restart the site. By default the server fetches `https://botrix.live/k/norochan/leaderboard` every 15 minutes and caches the result in `data.json`.
+2. If BotRix support issued a JSON endpoint and key, set `BOTRIX_LEADERBOARD_URL` (and `BOTRIX_API_KEY`, `BOTRIX_WATCHTIME_UNIT` if applicable). That official source is used instead of the public page.
+3. Set `BOTRIX_PUBLIC=0` to turn the board off until an issued endpoint is configured.
+4. Reset BotRix rankings at the start of each month if you want "Current" to mean this calendar month. BotRix totals are cumulative since the last reset.
 
-**How it works**: the server syncs on a timer and stores results in `data.json` under `viewerLeaderboard` (current month plus 24 monthly snapshots). Visitors read the stored copy from `GET /api/viewers/current` and `GET /api/viewers/previous`; they never trigger BotRix requests. Failures keep the last good data, back off, and respect `Retry-After`. Without configuration the card shows "coming soon" and the endpoints return `501`.
+**How it works**: the Node process syncs on a timer and stores results in `data.json` under `viewerLeaderboard`. Visitors read `GET /api/viewers/current`, `GET /api/viewers/previous`, or `GET /api/botrix/leaderboard`. They never call BotRix. Failures keep the last good snapshot. Keys never leave the server.
 
-**Limitations**: BotRix only counts watch time for viewers active in chat; there are no webhooks, exports or history from BotRix; field names are confirmed only once BotRix grants access. No data is ever estimated or invented.
+**Limitations**: BotRix only counts watch time for viewers active in chat; there is no BotRix history API; the public page may be blocked by Cloudflare, in which case the last snapshot stays on screen. No data is ever estimated or invented.
 
 ## KICK API limitation: exact viewer watch-time leaderboard is not officially supported
 The official KICK public docs provide OAuth 2.1 flows, public channel/livestream endpoints, and webhook event payloads for chat, follows, subscriptions, rewards, and livestream status. They do not provide an official documented endpoint or webhook for:

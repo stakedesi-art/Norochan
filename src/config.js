@@ -1,7 +1,28 @@
 'use strict';
-// Site settings. CONFIG is edited by hand; everything else comes from environment variables
-// (secrets are NEVER stored in a file). Paths resolve relative to src/ exactly as before.
+// Site settings. CONFIG is edited by hand; secrets come from environment variables
+// or a gitignored .env file. Never commit STAKE_TOKEN, Kick, or Gmail secrets.
+const fs = require('fs');
 const path = require('path');
+
+function loadDotEnv() {
+  const file = path.join(__dirname, '..', '.env');
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch { return; }
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+loadDotEnv();
 
 // ============================================================
 // CONFIG: edit everything you want to change right here.
@@ -60,6 +81,24 @@ const REFRESH_MS = Math.max(1000, Number(process.env.REFRESH_MS) || 60 * 60 * 10
 const STAKE_EXCLUSIVE = ['1', 'true', 'yes'].includes(String(process.env.STAKE_EXCLUSIVE || '').toLowerCase());
 const ALL_CAMPAIGNS = ['1', 'true', 'yes'].includes(String(process.env.ALL_CAMPAIGNS || '').toLowerCase());
 const RACE_CAMPAIGN_CODE = String(process.env.RACE_CAMPAIGN_CODE || 'Norochan').trim() || 'Norochan';
+const WHEEL_EXCLUDE = String(process.env.WHEEL_EXCLUDE || 'YASH001KG')
+  .split(/[,;]+/)
+  .map((s) => s.trim())
+  .filter(Boolean);
+const DISCORD_WHEEL_WEBHOOK = String(process.env.DISCORD_WHEEL_WEBHOOK || '').trim();
+const PUBLIC_SITE_URL = String(process.env.PUBLIC_SITE_URL || 'https://norochan.com').trim().replace(/\/+$/, '') || 'https://norochan.com';
+const BASE_URL = String(process.env.BASE_URL || PUBLIC_SITE_URL).trim().replace(/\/+$/, '') || PUBLIC_SITE_URL;
+const AUTH_TEST = ['1', 'true', 'yes'].includes(String(process.env.AUTH_TEST || '').toLowerCase());
+const OWNER_CODES = String(process.env.OWNER_CODES || 'norochan,divu,ipl2026,deepu')
+  .split(/[,;]+/)
+  .map((s) => s.trim())
+  .filter(Boolean);
+const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+const GOOGLE_CLIENT_SECRET = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+const KICK_CLIENT_ID = String(process.env.KICK_CLIENT_ID || '').trim();
+const KICK_CLIENT_SECRET = String(process.env.KICK_CLIENT_SECRET || '').trim();
+const KICK_REDIRECT_URI = String(process.env.KICK_REDIRECT_URI || (BASE_URL + '/auth/kick/callback')).trim();
+const GOOGLE_REDIRECT_URI = String(process.env.GOOGLE_REDIRECT_URI || (BASE_URL + '/auth/google/callback')).trim();
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = path.join(__dirname, 'data');
 const LEADERBOARD_CSV = path.join(DATA_DIR, 'leaderboard.csv');
@@ -78,6 +117,18 @@ module.exports = {
   STAKE_EXCLUSIVE,
   ALL_CAMPAIGNS,
   RACE_CAMPAIGN_CODE,
+  WHEEL_EXCLUDE,
+  DISCORD_WHEEL_WEBHOOK,
+  PUBLIC_SITE_URL,
+  BASE_URL,
+  AUTH_TEST,
+  OWNER_CODES,
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  GOOGLE_REDIRECT_URI,
+  KICK_CLIENT_ID,
+  KICK_CLIENT_SECRET,
+  KICK_REDIRECT_URI,
   PUBLIC_DIR,
   DATA_DIR,
   LEADERBOARD_CSV,

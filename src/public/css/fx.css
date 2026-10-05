@@ -4,21 +4,21 @@
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --kick-green: 83, 252, 24;
   --shadow-layered: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 2px 4px rgba(0, 0, 0, 0.22), 0 18px 40px -14px rgba(0, 0, 0, 0.6);
-  --shadow-lifted: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 60px -20px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(109, 91, 255, 0.22), 0 18px 44px -12px rgba(109, 91, 255, 0.3);
+  --shadow-lifted: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 60px -20px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 229, 255, 0.22), 0 18px 44px -12px rgba(0, 229, 255, 0.3);
   --spot-color: rgba(255, 255, 255, 0.07);
-  --spot-tint: rgba(109, 91, 255, 0.12);
+  --spot-tint: rgba(0, 229, 255, 0.12);
 }
 :root[data-theme="light"] {
   --shadow-layered: 0 1px 2px rgba(16, 17, 28, 0.06), 0 14px 30px -14px rgba(16, 17, 28, 0.18);
-  --shadow-lifted: 0 26px 50px -20px rgba(40, 30, 110, 0.3), 0 0 0 1px rgba(109, 91, 255, 0.22);
+  --shadow-lifted: 0 26px 50px -20px rgba(0, 40, 48, 0.3), 0 0 0 1px rgba(0, 229, 255, 0.22);
   --spot-color: rgba(255, 255, 255, 0.5);
-  --spot-tint: rgba(109, 91, 255, 0.08);
+  --spot-tint: rgba(0, 229, 255, 0.08);
 }
 
 main:focus, main:focus-visible { outline: none; }
 
-/* ---------- Ambient light ---------- */
-body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-change: transform; }
+/* ---------- Ambient light (static — no drift) ---------- */
+body::after { animation: none; }
 @keyframes ambient-drift {
   from { transform: translate3d(0, 0, 0) scale(1); }
   to { transform: translate3d(-3%, 2.5%, 0) scale(1.06); }
@@ -34,8 +34,8 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
   pointer-events: none;
   transform: scaleX(0);
   transform-origin: 0 50%;
-  background: linear-gradient(90deg, #5b6cff, #8b6cff 55%, #f6c445);
-  box-shadow: 0 0 12px rgba(139, 108, 255, 0.7);
+  background: linear-gradient(90deg, #00e5ff, #34d3ea 55%, #67e8f9);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.7);
 }
 
 /* Section light pools sit behind content and bleed past the container edges. */
@@ -45,17 +45,16 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
   position: absolute;
   z-index: -1;
   pointer-events: none;
-  /* Spans the viewport width without overflowing it (10px allows for the scrollbar). */
-  left: calc((100% - 100vw) / 2 + 10px);
-  right: calc((100% - 100vw) / 2 + 10px);
+  left: calc((100% - 100vw) / 2);
+  right: calc((100% - 100vw) / 2);
 }
 .hero-shell::before {
   top: -140px;
   bottom: -100px;
   background:
-    radial-gradient(520px 420px at 78% 42%, rgba(109, 91, 255, 0.3), transparent 70%),
+    radial-gradient(520px 420px at 78% 42%, rgba(0, 229, 255, 0.3), transparent 70%),
     radial-gradient(460px 320px at 12% 72%, rgba(246, 196, 69, 0.1), transparent 70%),
-    radial-gradient(380px 260px at 30% 10%, rgba(91, 108, 255, 0.14), transparent 70%);
+    radial-gradient(380px 260px at 30% 10%, rgba(52, 211, 234, 0.14), transparent 70%);
   animation: light-breathe 9s ease-in-out infinite alternate;
 }
 #rewards::before {
@@ -63,7 +62,7 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
   bottom: -60px;
   background:
     radial-gradient(560px 300px at 34% 46%, rgba(246, 196, 69, 0.13), transparent 70%),
-    radial-gradient(420px 280px at 88% 80%, rgba(109, 91, 255, 0.12), transparent 70%);
+    radial-gradient(420px 280px at 88% 80%, rgba(0, 229, 255, 0.12), transparent 70%);
 }
 #streams::before {
   top: -60px;
@@ -78,14 +77,14 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
 #community::before {
   top: -60px;
   bottom: -40px;
-  background: radial-gradient(640px 280px at 50% 70%, rgba(109, 91, 255, 0.12), transparent 70%);
+  background: radial-gradient(640px 280px at 50% 70%, rgba(0, 229, 255, 0.12), transparent 70%);
 }
 .leaderboard-page::before {
   top: -160px;
   height: 620px;
   background:
     radial-gradient(ellipse 22% 100% at 50% 0%, rgba(246, 196, 69, 0.16), transparent 75%),
-    radial-gradient(ellipse 45% 85% at 50% 0%, rgba(109, 91, 255, 0.2), transparent 75%);
+    radial-gradient(ellipse 45% 85% at 50% 0%, rgba(0, 229, 255, 0.2), transparent 75%);
   animation: light-breathe 8s ease-in-out infinite alternate;
 }
 @keyframes light-breathe {
@@ -93,15 +92,15 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
   to { opacity: 1; }
 }
 
-#home-leaderboard { box-shadow: var(--shadow-layered), 0 0 90px -20px rgba(109, 91, 255, 0.28); }
+#home-leaderboard { box-shadow: var(--shadow-layered), 0 0 90px -20px rgba(0, 229, 255, 0.28); }
 
 /* ---------- Depth ---------- */
 .reward-card, .community-card, .stat-card, .payout-card, .race-card, .board-card, .kick-live-card, .promo-panel, .hero-visual, .support-card {
   box-shadow: var(--shadow-layered);
 }
 .reward-card.place-1 { box-shadow: var(--shadow-layered), 0 0 60px -10px rgba(246, 196, 69, 0.22); }
-.hero-visual { box-shadow: var(--shadow-layered), 0 40px 80px -30px rgba(109, 91, 255, 0.45); }
-.hero-copy h1 { text-shadow: 0 12px 48px rgba(109, 91, 255, 0.28); }
+.hero-visual { box-shadow: var(--shadow-layered), 0 40px 80px -30px rgba(0, 229, 255, 0.45); }
+.hero-copy h1 { text-shadow: 0 12px 48px rgba(0, 229, 255, 0.28); }
 :root[data-theme="light"] .hero-copy h1 { text-shadow: none; }
 .promo-code-box { transition: border-color 260ms var(--ease-out), box-shadow 260ms var(--ease-out); }
 .promo-panel:hover .promo-code-box {
@@ -187,7 +186,7 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
 }
 .btn:not(.secondary):not(.ghost):not(.outline):not(.danger):not(.icon):hover::after { transform: translateX(230%) skewX(-18deg); }
 .btn:active { transform: translateY(0) scale(0.97); transition-duration: 90ms; }
-.btn.secondary:hover, .btn.outline:hover { box-shadow: 0 0 0 1px rgba(109, 91, 255, 0.2), 0 10px 26px -10px rgba(109, 91, 255, 0.45); }
+.btn.secondary:hover, .btn.outline:hover { box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.2), 0 10px 26px -10px rgba(0, 229, 255, 0.45); }
 
 /* Nav links: glowing underline on hover and for the active section. */
 .site-nav a { position: relative; }
@@ -200,8 +199,8 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
   height: 2px;
   margin-left: -8px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #8b6cff, #f6c445);
-  box-shadow: 0 0 10px rgba(139, 108, 255, 0.8);
+  background: linear-gradient(90deg, #34d3ea, #f6c445);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.8);
   transform: scaleX(0);
   transition: transform 320ms var(--ease-spring);
 }
@@ -210,7 +209,7 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
 /* Leaderboard rows: accent bar and depth on hover. */
 @media (hover: hover) and (pointer: fine) {
   .leaderboard-row:hover:not(.leaderboard-head):not(.top3) {
-    box-shadow: inset 3px 0 0 var(--accent), inset 0 -1px 0 var(--border-subtle), 0 10px 24px -14px rgba(109, 91, 255, 0.5);
+    box-shadow: inset 3px 0 0 var(--accent), inset 0 -1px 0 var(--border-subtle), 0 10px 24px -14px rgba(0, 229, 255, 0.5);
   }
   .leaderboard-row.top3:hover { box-shadow: var(--glass-shadow), 0 14px 34px -12px rgba(0, 0, 0, 0.6); }
   .podium-col:hover .podium-stand { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 26px 46px -14px rgba(0, 0, 0, 0.7); }
@@ -218,8 +217,8 @@ body::after { animation: ambient-drift 38s ease-in-out infinite alternate; will-
 }
 .leaderboard-row { transition: transform 300ms var(--ease-spring), background 220ms var(--ease-out), border-color 220ms var(--ease-out), box-shadow 260ms var(--ease-out); }
 
-/* Live Kick card breathes. */
-.kick-live-card[data-live="true"] { animation: live-glow 2.6s ease-in-out infinite; }
+/* Live Kick card uses the live badge/dot, not a pulsing box-shadow. */
+.kick-live-card[data-live="true"] { animation: none; }
 @keyframes live-glow {
   0%, 100% { box-shadow: var(--shadow-layered), 0 0 0 1px rgba(var(--kick-green), 0.25), 0 0 30px rgba(var(--kick-green), 0.08); }
   50% { box-shadow: var(--shadow-layered), 0 0 0 1px rgba(var(--kick-green), 0.45), 0 0 54px rgba(var(--kick-green), 0.2); }

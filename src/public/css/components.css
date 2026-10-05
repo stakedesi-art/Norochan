@@ -27,17 +27,17 @@
   border-radius: var(--radius-pill);
   padding: 12px 22px;
   background: var(--accent);
-  color: #ffffff;
-  box-shadow: 0 8px 24px rgba(124, 92, 255, 0.22);
+  color: var(--gold-ink);
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.28);
   transition: filter var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
 }
-.btn:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 12px 28px rgba(124, 92, 255, 0.28); }
+.btn:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 12px 28px rgba(0, 229, 255, 0.28); }
 .btn:active { transform: translateY(0); }
 .btn.secondary:hover, .btn.ghost:hover, .btn.outline:hover, .btn.danger:hover { filter: none; transform: none; }
 .btn:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 :root[data-theme="light"] .btn:not(.secondary):not(.ghost):not(.outline):not(.danger) {
-  background: #6d6cf0;
+  background: #00e5ff;
   color: #ffffff;
 }
 

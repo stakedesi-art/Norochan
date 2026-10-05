@@ -31,6 +31,7 @@ function parseLeaderboardCsv(text) {
   let weightedIdx = headers.indexOf('total_weighted_amount');
   if (weightedIdx === -1) weightedIdx = headers.indexOf('total_wagered_amount');
   const campaignIdx = headers.indexOf('campaign_code');
+  const wageredIdx = headers.indexOf('total_wagered_amount');
   if (rankIdx === -1 || userIdx === -1 || weightedIdx === -1) {
     throw new StakeError(`Leaderboard CSV missing required columns: rank, user_name, total_weighted_amount (found: ${rows[0].join(', ') || 'none'}).`, 'bad_columns');
   }
@@ -40,8 +41,10 @@ function parseLeaderboardCsv(text) {
     const user = (row[userIdx] || '').trim();
     const weighted = parseNumericCsvValue(row[weightedIdx]);
     const campaign = campaignIdx === -1 ? null : normalizeCampaignCode(row[campaignIdx]);
+    const wageredRaw = wageredIdx === -1 ? NaN : parseNumericCsvValue(row[wageredIdx]);
     if (!user || !Number.isFinite(rank) || !Number.isFinite(weighted)) continue;
-    entries.push({ rank, user, weighted, campaign: campaign || null });
+    const wagered = Number.isFinite(wageredRaw) ? wageredRaw : null;
+    entries.push({ rank, user, weighted, wagered, tickets: ticketsFromWager(wagered), campaign: campaign || null });
   }
   entries.sort((a, b) => a.rank - b.rank);
   if (!ALL_CAMPAIGNS) {
@@ -171,6 +174,7 @@ async function fetchLeaderboard(monthOffset = 0) {
     const userIdx = headers.indexOf('user_name');
     const weightedIdx = headers.indexOf('total_weighted_amount');
     const campaignIdx = headers.indexOf('campaign_code');
+    const wageredIdx = headers.indexOf('total_wagered_amount');
     if (rankIdx === -1 || userIdx === -1 || weightedIdx === -1) {
       throw new StakeError(`Leaderboard CSV missing required columns: rank, user_name, total_weighted_amount (found: ${rows[0].join(', ') || 'none'}).`, 'bad_columns');
     }
@@ -180,8 +184,10 @@ async function fetchLeaderboard(monthOffset = 0) {
       const weighted = parseNumericCsvValue(r[weightedIdx]);
       const user = (r[userIdx] || '').trim();
       const campaign = campaignIdx === -1 ? null : normalizeCampaignCode(r[campaignIdx]);
+      const wageredRaw = wageredIdx === -1 ? NaN : parseNumericCsvValue(r[wageredIdx]);
       if (!user || !Number.isFinite(rank) || !Number.isFinite(weighted)) continue;
-      pageEntries.push({ rank, user, weighted, campaign: campaign || null });
+      const wagered = Number.isFinite(wageredRaw) ? wageredRaw : null;
+      pageEntries.push({ rank, user, weighted, wagered, tickets: ticketsFromWager(wagered), campaign: campaign || null });
     }
     totalRowsBeforeFilter += pageEntries.length;
     for (const entry of pageEntries) {
@@ -204,7 +210,7 @@ async function fetchLeaderboard(monthOffset = 0) {
     if (dataRows.length < 100) break;
   }
   entries.sort((a, b) => a.rank - b.rank);
-  const finalEntries = entries.slice(0, CONFIG.race.top).map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const finalEntries = entries.map((entry, index) => ({ ...entry, rank: index + 1 }));
   console.log(`[leaderboard-refresh] totalRowsBeforeFilter=${totalRowsBeforeFilter} distinctCampaignCodes=${[...allDistinctCampaignCodes].length ? [...allDistinctCampaignCodes].join('|') : '(none)'} totalRowsAfterFilter=${finalEntries.length}`);
   return finalEntries;
 }
@@ -215,7 +221,28 @@ async function fetchLeaderboard(monthOffset = 0) {
 const state = {
   leaderboard: { entries: [], updatedAt: null, error: null },
   previousLeaderboard: { entries: [], updatedAt: null, error: null },
+  wheelPool: {
+    current: { period: null, rows: [] },
+    previous: { period: null, rows: [] },
+  },
+  referred: { byUser: {}, updatedAt: null, error: null },
 };
+
+function utcMonthKey(offset = 0, now = Date.now()) {
+  const d = new Date(now);
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + offset, 1));
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function applyFullList(full, monthKey, stamp) {
+  const race = full.slice(0, CONFIG.race.top).map((entry, index) => ({ ...entry, rank: index + 1 }));
+  state[monthKey].entries = race;
+  state[monthKey].updatedAt = stamp;
+  state[monthKey].error = null;
+  const slot = monthKey === 'leaderboard' ? 'current' : 'previous';
+  const offset = monthKey === 'leaderboard' ? 0 : -1;
+  state.wheelPool[slot] = { period: utcMonthKey(offset, stamp), rows: full };
+}
 let refreshing = false;
 
 async function refreshAll() {
@@ -227,12 +254,9 @@ async function refreshAll() {
       readCsvFallbacks(true);
       const leaderboardData = csvFallbackState.leaderboard.data;
       if (leaderboardData.length) {
-        state.leaderboard.entries = leaderboardData;
-        state.leaderboard.updatedAt = csvFallbackState.leaderboard.updatedAt || Date.now();
-        state.leaderboard.error = null;
-        state.previousLeaderboard.entries = leaderboardData;
-        state.previousLeaderboard.updatedAt = csvFallbackState.leaderboard.updatedAt || Date.now();
-        state.previousLeaderboard.error = null;
+        const stamp = csvFallbackState.leaderboard.updatedAt || Date.now();
+        applyFullList(leaderboardData, 'leaderboard', stamp);
+        applyFullList(leaderboardData, 'previousLeaderboard', stamp);
         console.log(`[csv-fallback] Loaded local CSV data (leaderboard: ${leaderboardData.length} rows).`);
         return;
       }
@@ -246,19 +270,14 @@ async function refreshAll() {
     ]) {
       try {
         const data = await fn();
-        state[key].entries = data;
-        state[key].updatedAt = Date.now();
-        state[key].error = null;
+        applyFullList(data, key, Date.now());
         console.log(`[stake] ${label} refreshed (${data.length} rows).`);
       } catch (err) {
         const fallbackChanged = readCsvFallbacks(false);
         if (fallbackChanged) {
-          state.leaderboard.entries = csvFallbackState.leaderboard.data;
-          state.leaderboard.updatedAt = csvFallbackState.leaderboard.updatedAt || Date.now();
-          state.leaderboard.error = null;
-          state.previousLeaderboard.entries = csvFallbackState.leaderboard.data;
-          state.previousLeaderboard.updatedAt = csvFallbackState.leaderboard.updatedAt || Date.now();
-          state.previousLeaderboard.error = null;
+          const stamp = csvFallbackState.leaderboard.updatedAt || Date.now();
+          applyFullList(csvFallbackState.leaderboard.data, 'leaderboard', stamp);
+          applyFullList(csvFallbackState.leaderboard.data, 'previousLeaderboard', stamp);
           console.warn(`[stake] ${label} refresh FAILED: ${err.message}. Serving CSV fallback data instead.`);
           continue;
         }
@@ -275,11 +294,15 @@ async function refreshAll() {
 // ============================================================
 // Race helpers
 // ============================================================
-const mask = (name) => Array.from(name).slice(0, 2).join('') + '***';
+const mask = (name) => {
+  const chars = Array.from(String(name || ''));
+  if (chars.length <= 4) return chars.slice(0, 2).join('') + '***';
+  return chars.slice(0, 2).join('') + '***' + chars.slice(-2).join('');
+};
+const TICKET_WAGER_USD = 1000;
+const ticketsFromWager = (wagered) => (Number.isFinite(wagered) && wagered > 0 ? Math.floor(wagered / TICKET_WAGER_USD) : 0);
 function prizeFor(rank) {
-  if (CONFIG.prizes[rank] != null) return CONFIG.prizes[rank];
-  const r = CONFIG.prizeRanges.find((x) => rank >= x.from && rank <= x.to);
-  return r ? r.amount : null;
+  return require('./rewards').racePrizeFor(rank);
 }
 
-module.exports = { StakeError, state, refreshAll, mask, prizeFor };
+module.exports = { StakeError, state, refreshAll, stakeGet, mask, prizeFor, ticketsFromWager, TICKET_WAGER_USD };

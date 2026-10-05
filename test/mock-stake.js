@@ -29,10 +29,27 @@ http.createServer((req, res) => {
   const send = (code, body, type = 'text/csv') => { res.writeHead(code, { 'Content-Type': type }); res.end(body); };
 
   if (url.pathname.startsWith('/__mode/')) { mode = url.pathname.split('/').pop(); return send(200, 'mode=' + mode, 'text/plain'); }
-  if (!req.headers['x-access-token'] || mode === '401') return send(401, '{"error":"unauthorized"}', 'application/json');
+    if (url.pathname.startsWith('/__bet/')) {
+      const iid = decodeURIComponent(url.pathname.split('/').pop() || 'bet');
+      const hidden = url.searchParams.get('ghost') === '1';
+      const payload = {
+        user: hidden ? null : { name: url.searchParams.get('user') || 'Alice_W' },
+        game: { slug: url.searchParams.get('game') || 'limbo' },
+        payoutMultiplier: Number(url.searchParams.get('m') || '2.847291'),
+        amount: Number(url.searchParams.get('amount') || '0.01'),
+        hidden,
+        iid,
+      };
+      return send(200, `<!doctype html><script id="noro-bet" type="application/json">${JSON.stringify(payload)}</script>`, 'text/html');
+    }
+    if (!req.headers['x-access-token'] || mode === '401') return send(401, '{"error":"unauthorized"}', 'application/json');
   if (!/text\/csv/.test(req.headers.accept || '')) return send(406, 'need text/csv', 'text/plain');
 
-  if (url.pathname === '/leaderboard') {
+    if (url.pathname === '/referred-users') {
+      const lines = ['user_name,campaign_code', 'Alice_W,Norochan', 'bobby99,divu', 'luna.x,ipl2026', 'haru_k,deepu'];
+      return send(200, lines.join('\n') + '\n');
+    }
+    if (url.pathname === '/leaderboard') {
     const q = url.searchParams;
     if (q.get('timePeriod') === 'currentMonth') return send(200, leaderboardCsv(Math.min(Number(q.get('limit')) || 100, 100)));
     for (const k of ['startDate', 'endDate']) {

@@ -6,12 +6,23 @@ const { HttpError, sendJson } = require('../lib/http');
 const { state, mask, prizeFor } = require('../services/stake');
 const { fetchKickChannelStatus } = require('../services/kick');
 const { botrix, VIEWER_TRACKING_UNSUPPORTED, viewerRewardFor } = require('../services/viewers');
-const { publicRewards } = require('../services/rewards');
+const { publicRewards, publicRacePrizes, publicViewerRewards } = require('../services/rewards');
+const { publicFeed } = require('../services/content');
+const { publicWheel } = require('../services/wheel');
+const { handleAdmin } = require('./admin');
+const { handleAccount, authPublic } = require('./account');
+const accounts = require('../services/accounts');
 
 const isRealLink = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
 
 async function handleApi(req, res, url) {
+  if (url.pathname === '/api/admin' || url.pathname.startsWith('/api/admin/')) return await handleAdmin(req, res, url);
+  await handleAccount(req, res, url);
+  if (res.headersSent) return;
   const route = `${req.method} ${url.pathname}`;
+  if (['POST /api/login', 'POST /api/signup', 'POST /api/logout', 'POST /api/profile', 'POST /api/connect-provider'].includes(route)) {
+    return sendJson(res, 405, { error: 'Method not allowed.' }, { Allow: 'GET, HEAD' });
+  }
 
   if (route === 'GET /api/config') {
     const links = {};
@@ -28,10 +39,11 @@ async function handleApi(req, res, url) {
         reason: botrix.configured ? null : VIEWER_TRACKING_UNSUPPORTED,
         docs: 'https://botrix.live/docs/',
       },
-      viewerRewards: { ...CONFIG.viewerRewards },
+      viewerRewards: publicViewerRewards(),
       links,
-      prizes: Object.fromEntries(Array.from({ length: CONFIG.race.top }, (_, i) => [i + 1, prizeFor(i + 1)]).filter(([, amount]) => amount != null)),
+      prizes: publicRacePrizes(),
       race: { title: CONFIG.race.title, startsAt: CONFIG.race.startsAt, endsAt: CONFIG.race.endsAt, top: CONFIG.race.top },
+      auth: authPublic(),
     });
   }
 
@@ -39,8 +51,19 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, publicRewards());
   }
 
+  if (route === 'GET /api/feed') {
+    return sendJson(res, 200, publicFeed());
+  }
+
+  if (route === 'GET /api/wheel') {
+    return sendJson(res, 200, publicWheel());
+  }
+  if (url.pathname === '/api/wheel' && req.method !== 'GET' && req.method !== 'HEAD') {
+    return sendJson(res, 405, { error: 'Method not allowed.' }, { Allow: 'GET, HEAD' });
+  }
+
   const viewerRoute = /^GET \/api\/viewers\/(current|previous)$/.exec(route);
-  if (viewerRoute || route === 'GET /api/kick/leaderboard' || route === 'GET /api/kick/top-viewers') {
+  if (viewerRoute || route === 'GET /api/kick/leaderboard' || route === 'GET /api/kick/top-viewers' || route === 'GET /api/botrix/leaderboard') {
     const period = viewerRoute ? viewerRoute[1] : String(url.searchParams.get('period') || 'current').trim().toLowerCase();
     if (!['current', 'previous'].includes(period)) {
       return sendJson(res, 400, { error: 'Invalid period. Use "current" or "previous".' });
@@ -55,7 +78,7 @@ async function handleApi(req, res, url) {
         entries: [],
       });
     }
-    return sendJson(res, 200, { available: true, ...botrix.publicPeriod(botrix.ensureStore(storage.db), period, viewerRewardFor) });
+    return sendJson(res, 200, { available: true, prizePool: publicRewards().viewerPrizePool, ...botrix.publicPeriod(botrix.ensureStore(storage.db), period, viewerRewardFor) });
   }
 
   if (route === 'GET /api/kick-live') {
@@ -78,12 +101,18 @@ async function handleApi(req, res, url) {
   }
 
   if (route === 'GET /api/leaderboard') {
-    const mapEntries = (lb) => lb.entries.map((e) => ({
-      rank: e.rank,
-      name: mask(e.user),
-      weighted: Math.round(e.weighted * 100) / 100,
-      prize: prizeFor(e.rank),
-    }));
+    const me = accounts.accountFromReq(req);
+    const youName = me && me.codeStatus === 'verified' && me.stakeUser ? String(me.stakeUser).toLowerCase() : '';
+    const mapEntries = (lb) => lb.entries.map((e) => {
+      const row = {
+        rank: e.rank,
+        name: mask(e.user),
+        weighted: Math.round(e.weighted * 100) / 100,
+        prize: prizeFor(e.rank),
+      };
+      if (youName && String(e.user || '').toLowerCase() === youName) row.you = true;
+      return row;
+    });
     const lb = state.leaderboard;
     const prev = state.previousLeaderboard;
     const message = lb.error ? 'Leaderboard temporarily unavailable' : undefined;
