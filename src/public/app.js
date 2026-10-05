@@ -1542,7 +1542,7 @@
       : authErr === 'kick-ok' ? 'Kick username connected.'
       : authErr === 'kick-taken' ? 'That Kick account is already connected to another Norochan account.'
       : authErr === 'kick-error' ? 'Kick did not finish. Try again.'
-      : authErr && authErr !== 'ok' ? 'Sign-in did not finish. Try email, Google, or Kick.' : '';
+      : authErr && authErr !== 'ok' ? 'Sign-in did not finish. Try email or Google.' : '';
 
     function paint(me) {
       paintNavAccount(me);
@@ -1556,7 +1556,9 @@
         const form = h('form', { class: 'account-card' },
           h('span', { class: 'eyebrow' }, 'Account'),
           h('h1', {}, 'Sign in or create an account'),
-          h('p', { class: 'muted' }, 'Email and a password, or Google / Kick. After email signup we send a confirmation link to your inbox.'),
+          h('p', { class: 'muted' }, providers.google
+            ? 'Email and a password, or Google. After email signup we send a confirmation link to your inbox.'
+            : 'Email and a password. After email signup we send a confirmation link to your inbox.'),
           h('label', { class: 'studio-field' }, h('span', {}, 'Email'), email),
           h('label', { class: 'studio-field' }, h('span', {}, 'Password'), password),
           status,
@@ -1584,7 +1586,6 @@
         });
         const oauthRow = h('div', { class: 'account-oauth' });
         if (providers.google) oauthRow.append(h('a', { class: 'btn secondary', href: '/auth/google' }, 'Continue with Google'));
-        oauthRow.append(h('a', { class: 'btn secondary', href: '/auth/kick' }, 'Continue with Kick'));
         const signedOut = [
           h('header', { class: 'page-intro' }, h('span', { class: 'eyebrow' }, 'Account'), h('h1', {}, 'Your Norochan account')),
           form,
