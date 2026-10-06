@@ -1,15 +1,13 @@
 'use strict';
 // BotRix "Top viewers" leaderboard.
-// Official JSON endpoint (BOTRIX_LEADERBOARD_URL) is used when BotRix support issued one.
-// Otherwise the server fetches the public channel leaderboard page and parses it.
+// Default: official public JSON API (no key). Optional BOTRIX_LEADERBOARD_URL if BotRix issued one.
 // Visitors never call BotRix; credentials never leave this process.
-
 const PROVIDER = 'botrix';
 const MAX_BODY_BYTES = 1024 * 1024;
 const MIN_SYNC_MS = 5 * 60 * 1000;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
 const WATCH_UNITS = { seconds: 1, minutes: 60, hours: 3600 };
-const DEFAULT_PUBLIC_URL = 'https://botrix.live/k/{channel}/leaderboard';
+const DEFAULT_PUBLIC_URL = 'https://botrix.live/api/public/leaderboard?platform={platform}&user={channel}';
 const LIST_KEYS = ['data', 'leaderboard', 'users', 'entries', 'results', 'items', 'viewers'];
 const NAME_KEYS = ['username', 'name', 'user_name', 'displayName', 'display_name', 'nick', 'slug'];
 const ID_KEYS = ['userId', 'user_id', 'platformId', 'platform_id', 'uid', 'id'];
@@ -74,7 +72,7 @@ function parseEndpoint(raw, vars, name = 'BOTRIX_LEADERBOARD_URL') {
   if (!value) return { url: null, error: null };
   let url;
   try {
-    url = new URL(value.replace(/\{(channel|platform)\}/g, (_, k) => encodeURIComponent(vars[k])));
+    url = new URL(value.replace(/\{(channel|platform|user)\}/g, (_, k) => encodeURIComponent(k === 'user' ? vars.channel : vars[k])));
   } catch { return { url: null, error: `${name} is not a valid URL.` }; }
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) {
@@ -84,19 +82,6 @@ function parseEndpoint(raw, vars, name = 'BOTRIX_LEADERBOARD_URL') {
 }
 function publicEnabledFromEnv(env) {
   return !['0', 'false', 'off', 'no'].includes(String(env.BOTRIX_PUBLIC == null ? '1' : env.BOTRIX_PUBLIC).trim().toLowerCase());
-}
-
-function stripTags(s) {
-  return String(s || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&quot;/gi, '"')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function parseWatchtimeToSeconds(v) {
@@ -130,18 +115,6 @@ function formatWatchtimeDisplay(secs) {
   return `${mins}m`;
 }
 
-function mapHeader(h) {
-  const x = String(h || '').trim().toLowerCase();
-  if (!x) return null;
-  if (/^(#|pos|position|rank)$/.test(x) || /\b(pos|position|rank)\b/.test(x)) return 'rank';
-  if (/\b(name|user|viewer)\b/.test(x) || x === 'username') return 'username';
-  if (/watch/.test(x)) return 'watchtime';
-  if (/point/.test(x)) return 'points';
-  if (/message/.test(x)) return 'messages';
-  if (/level/.test(x)) return 'level';
-  return null;
-}
-
 function looksLikeEntry(item) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
   const name = pick(item, NAME_KEYS) ?? (typeof item.user === 'string' ? item.user : undefined) ?? pick(item.user, NAME_KEYS);
@@ -168,65 +141,6 @@ function findLeaderboardArray(node, depth = 0) {
     if (found) return found;
   }
   return null;
-}
-
-function extractJsonBlobs(html) {
-  const out = [];
-  const re = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = re.exec(html))) {
-    const body = String(m[1] || '').trim();
-    if (!body) continue;
-    const candidates = [];
-    if (body.startsWith('{') || body.startsWith('[')) candidates.push(body);
-    const assign = /=\s*(\{[\s\S]*\}|\[[\s\S]*\])\s*;?\s*$/.exec(body);
-    if (assign) candidates.push(assign[1]);
-    for (const candidate of candidates) {
-      try { out.push(JSON.parse(candidate)); } catch { /* skip non-JSON scripts */ }
-    }
-  }
-  return out;
-}
-
-function parseHtmlTables(html) {
-  const tables = String(html).match(/<table\b[\s\S]*?<\/table>/gi) || [];
-  for (const table of tables) {
-    const rows = [...table.matchAll(/<tr\b[\s\S]*?<\/tr>/gi)].map((m) => m[0]);
-    if (!rows.length) continue;
-    const cellsOf = (row) => [...row.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((m) => stripTags(m[1]));
-    const headerCells = cellsOf(rows[0]);
-    const headers = headerCells.map(mapHeader);
-    if (!headers.includes('username') || !(headers.includes('watchtime') || headers.includes('points') || headers.includes('rank'))) continue;
-    const data = [];
-    for (const row of rows.slice(1)) {
-      const cells = cellsOf(row);
-      if (cells.length < 2) continue;
-      const item = {};
-      headers.forEach((key, i) => { if (key && cells[i] != null && cells[i] !== '') item[key] = cells[i]; });
-      if (!item.username) continue;
-      if (item.watchtime) {
-        const sec = parseWatchtimeToSeconds(item.watchtime);
-        if (sec != null) item.watchtimeSeconds = sec;
-      }
-      data.push(item);
-    }
-    return data;
-  }
-  return null;
-}
-
-function parseHtmlLeaderboard(html) {
-  if (!html || typeof html !== 'string') return null;
-  const trimmed = html.trim();
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try { return JSON.parse(trimmed); } catch { /* fall through to HTML */ }
-  }
-  for (const blob of extractJsonBlobs(html)) {
-    const list = findLeaderboardArray(blob);
-    if (list) return { data: list };
-  }
-  const tableRows = parseHtmlTables(html);
-  return tableRows ? { data: tableRows } : null;
 }
 
 class BotrixLeaderboardService {
@@ -270,26 +184,17 @@ class BotrixLeaderboardService {
     return s;
   }
 
-  parseBody(text, { htmlOk }) {
-    const trimmed = String(text || '').trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-      try { return JSON.parse(trimmed); }
-      catch { throw new BotrixError('BotRix returned a response that is not JSON.', 'schema'); }
-    }
-    if (htmlOk) {
-      const parsed = parseHtmlLeaderboard(text);
-      if (parsed) return parsed;
-      throw new BotrixError('BotRix public page did not include leaderboard data.', 'schema');
-    }
-    throw new BotrixError('BotRix returned a response that is not JSON.', 'schema');
+  parseBody(text) {
+    try { return JSON.parse(String(text || '').trim()); }
+    catch { throw new BotrixError('BotRix returned a response that is not JSON.', 'schema'); }
   }
 
-  async fetchFrom(url, { official }) {
+  async fetchFrom(url, { sendKey = false } = {}) {
     const headers = {
-      Accept: official ? 'application/json' : 'application/json, text/html;q=0.9',
+      Accept: 'application/json',
       'User-Agent': 'norochan-site/1.0 (BotRix leaderboard)',
     };
-    if (official && this.apiKey) {
+    if (sendKey && this.apiKey) {
       headers[this.apiKeyHeader] = /^authorization$/i.test(this.apiKeyHeader) && !/\s/.test(this.apiKey)
         ? `Bearer ${this.apiKey}`
         : this.apiKey;
@@ -298,25 +203,25 @@ class BotrixLeaderboardService {
     try {
       res = await this.fetch(url, {
         headers,
-        redirect: official ? 'error' : 'follow',
+        redirect: 'error',
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (err) {
       throw new BotrixError(err && err.name === 'TimeoutError' ? 'BotRix did not respond in time.' : 'Could not reach BotRix.', 'network');
     }
     if (res.status === 429) throw new BotrixError('BotRix rate limit reached.', 'rate_limit', retryAfterMs(res.headers.get('retry-after')));
-    if (official && (res.status === 401 || res.status === 403)) {
+    if (sendKey && (res.status === 401 || res.status === 403)) {
       throw new BotrixError(`BotRix rejected the request (status ${res.status}). Check BOTRIX_API_KEY and BOTRIX_API_KEY_HEADER.`, 'auth');
     }
     if (!res.ok) throw new BotrixError(`BotRix returned status ${res.status}.`, 'http');
     const text = await res.text();
     if (text.length > MAX_BODY_BYTES) throw new BotrixError('BotRix response was unexpectedly large.', 'schema');
-    return this.parseBody(text, { htmlOk: !official });
+    return this.parseBody(text);
   }
 
   async fetchLeaderboard() {
-    if (this.endpoint) return this.fetchFrom(this.endpoint, { official: true });
-    if (this.publicUrl) return this.fetchFrom(this.publicUrl, { official: false });
+    if (this.endpoint) return this.fetchFrom(this.endpoint, { sendKey: true });
+    if (this.publicUrl) return this.fetchFrom(this.publicUrl, { sendKey: false });
     throw new BotrixError('BotRix is not configured.', 'not_configured');
   }
 
@@ -333,9 +238,14 @@ class BotrixLeaderboardService {
   }
 
   normalizeEntries(raw) {
-    const list = Array.isArray(raw)
-      ? raw
-      : (raw && typeof raw === 'object' ? LIST_KEYS.map((k) => raw[k]).find(Array.isArray) : null);
+    let list = null;
+    if (Array.isArray(raw)) list = raw;
+    else if (raw && typeof raw === 'object') {
+      for (const k of LIST_KEYS) {
+        if (Array.isArray(raw[k])) { list = raw[k]; break; }
+      }
+      if (!list) list = findLeaderboardArray(raw);
+    }
     if (!list) throw new BotrixError('BotRix response did not contain a leaderboard list.', 'schema');
 
     const seen = new Set();
@@ -538,7 +448,6 @@ module.exports = {
   monthOf,
   previousMonthOf,
   safeAvatar,
-  parseHtmlLeaderboard,
   parseWatchtimeToSeconds,
   formatWatchtimeDisplay,
 };

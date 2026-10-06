@@ -393,12 +393,13 @@ async function main() {
     check('BotRix key never sent to the browser', !vc.text.includes(BOTRIX_KEY) && !(await call('GET', '/api/config')).text.includes(BOTRIX_KEY) && !(await call('GET', '/api/botrix/leaderboard')).text.includes(BOTRIX_KEY));
 
     console.log('BotRix service (unit)');
-    const { BotrixLeaderboardService, parseHtmlLeaderboard, parseWatchtimeToSeconds, formatWatchtimeDisplay } = require('../src/services/botrix');
+    const { BotrixLeaderboardService, parseWatchtimeToSeconds, formatWatchtimeDisplay } = require('../src/services/botrix');
     const fixture = { data: [{ name: 'b', points: 50, watchtime: 10 }, { name: 'a', points: 90, watchtime: 30 }] };
     const okFetch = async () => new Response(JSON.stringify(fixture), { status: 200 });
     const env = { BOTRIX_LEADERBOARD_URL: 'https://botrix.example/lb/{channel}', BOTRIX_WATCHTIME_UNIT: 'minutes' };
-    check('public fallback is on without an issued BotRix URL', new BotrixLeaderboardService({ env: {} }).configured === true);
-    check('public fallback can be turned off', new BotrixLeaderboardService({ env: { BOTRIX_PUBLIC: '0' } }).configured === false);
+    check('public API is on without an issued BotRix URL', new BotrixLeaderboardService({ env: {} }).configured === true);
+    check('public API default URL uses platform and channel', new BotrixLeaderboardService({ env: {} }).publicUrl === 'https://botrix.live/api/public/leaderboard?platform=kick&user=norochan');
+    check('public API can be turned off', new BotrixLeaderboardService({ env: { BOTRIX_PUBLIC: '0' } }).configured === false);
     check('plain http endpoint refused', !!new BotrixLeaderboardService({ env: { BOTRIX_LEADERBOARD_URL: 'http://botrix.example/x', BOTRIX_PUBLIC: '0' } }).configError);
     let clock = Date.UTC(2026, 8, 30, 23, 55);
     const svc = new BotrixLeaderboardService({ env, channel: 'norochan', fetchImpl: okFetch, now: () => clock });
@@ -432,43 +433,57 @@ async function main() {
     await keyed.fetchLeaderboard();
     check('API key sent as Bearer header and redirects refused', sentHeaders.headers.Authorization === 'Bearer k1' && sentHeaders.redirect === 'error');
 
-    const htmlTable = '<table><tr><th>Position</th><th>Name</th><th>Points</th><th>Watchtime</th></tr>'
-      + '<tr><td>1</td><td>low</td><td>99999</td><td>1h 0m</td></tr>'
-      + '<tr><td>2</td><td>high</td><td>10</td><td>8h 10m</td></tr></table>';
     check('watchtime strings parse to seconds', parseWatchtimeToSeconds('8d 13h 45min') === ((8 * 24 + 13) * 60 + 45) * 60);
     check('watchtime display keeps days and minutes', formatWatchtimeDisplay(((8 * 24 + 13) * 60 + 45) * 60) === '8d 13h 45min');
-    const parsedHtml = parseHtmlLeaderboard('<html><body>' + htmlTable + '</body></html>');
-    check('public HTML table is parsed', Array.isArray(parsedHtml && parsedHtml.data) && parsedHtml.data[1].username === 'high');
-    const htmlSvc = new BotrixLeaderboardService({
-      env: { BOTRIX_PUBLIC_URL: 'http://127.0.0.1/k/norochan/leaderboard', BOTRIX_API_KEY: 'secret-key' },
-      fetchImpl: async (u, o) => { sentHeaders = o; return new Response(htmlTable, { status: 200, headers: { 'Content-Type': 'text/html' } }); },
+    let publicUrl = null;
+    const publicJson = [
+      { username: 'low', points: 99999, watchtime: 60 },
+      { username: 'high', points: 10, watchtime: 490 },
+    ];
+    const publicSvc = new BotrixLeaderboardService({
+      env: {
+        BOTRIX_PUBLIC_URL: 'http://127.0.0.1/api/public/leaderboard?platform=kick&user=norochan',
+        BOTRIX_API_KEY: 'secret-key',
+        BOTRIX_WATCHTIME_UNIT: 'minutes',
+        BOTRIX_TOP: '10',
+      },
+      fetchImpl: async (u, o) => {
+        publicUrl = u;
+        sentHeaders = o;
+        return new Response(JSON.stringify(publicJson), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      },
       now: () => clock,
     });
-    const htmlStore = htmlSvc.ensureStore({});
-    await htmlSvc.syncLeaderboard(htmlStore);
-    check('HTML watchtime ranking beats points and assigns ranks after sort',
-      htmlStore.current.entries.map((e) => e.username + ':' + e.rank).join(',') === 'high:1,low:2'
-      && htmlStore.current.entries[0].watchTime === 8 * 3600 + 10 * 60);
-    check('public page fetch never sends the API key', !sentHeaders.headers.Authorization && sentHeaders.redirect === 'follow');
-    const emptySvc = new BotrixLeaderboardService({ env: { ...env }, fetchImpl: async () => new Response('{"data":[]}', { status: 200 }), now: () => clock });
-    const emptyNorm = emptySvc.normalizeEntries({ data: [] });
-    check('empty BotRix list is accepted without invented names', emptyNorm.entries.length === 0);
+    const publicStore = publicSvc.ensureStore({});
+    await publicSvc.syncLeaderboard(publicStore);
+    check('public API URL keeps platform and user query', /platform=kick/.test(publicUrl) && /user=norochan/.test(publicUrl) && !/\/k\/norochan\/leaderboard/.test(publicUrl));
+    check('JSON watchtime ranking beats points and assigns ranks after sort',
+      publicStore.current.entries.map((e) => e.username + ':' + e.rank).join(',') === 'high:1,low:2'
+      && publicStore.current.entries[0].watchTime === 490 * 60);
+    check('public API fetch never sends an API key', !sentHeaders.headers.Authorization && sentHeaders.redirect === 'error' && sentHeaders.headers.Accept === 'application/json');
+    const emptySvc = new BotrixLeaderboardService({ env: { ...env }, fetchImpl: async () => new Response('[]', { status: 200 }), now: () => clock });
+    const emptyStore = emptySvc.ensureStore({});
+    await emptySvc.syncLeaderboard(emptyStore);
+    check('empty BotRix list is accepted without invented names', emptyStore.current.entries.length === 0 && emptySvc.publicPeriod(emptyStore, 'current').status === 'ok');
+    check('wrapped empty list is accepted', emptySvc.normalizeEntries({ data: [] }).entries.length === 0);
+    const many = Array.from({ length: 15 }, (_, i) => ({ username: 'viewer' + i, watchtime: 15 - i }));
+    check('public API is limited to the top 10', publicSvc.normalizeEntries(many).entries.length === 10 && publicSvc.normalizeEntries(many).entries[0].username === 'viewer0');
     clock += 60 * 1000;
-    htmlSvc.fetch = async () => { const err = new Error('aborted'); err.name = 'TimeoutError'; throw err; };
+    publicSvc.fetch = async () => { const err = new Error('aborted'); err.name = 'TimeoutError'; throw err; };
     let timeoutErr = null;
-    try { await htmlSvc.syncLeaderboard(htmlStore); } catch (err) { timeoutErr = err; }
-    check('timeout keeps the last snapshot', timeoutErr && timeoutErr.kind === 'network' && htmlStore.current.entries.length === 2);
-    htmlSvc.fetch = async () => new Response('nope', { status: 502 });
+    try { await publicSvc.syncLeaderboard(publicStore); } catch (err) { timeoutErr = err; }
+    check('timeout keeps the last snapshot', timeoutErr && timeoutErr.kind === 'network' && publicStore.current.entries.length === 2);
+    publicSvc.fetch = async () => new Response('nope', { status: 502 });
     let httpErr = null;
-    try { await htmlSvc.syncLeaderboard(htmlStore); } catch (err) { httpErr = err; }
-    check('HTTP error keeps the last snapshot', httpErr && httpErr.kind === 'http' && htmlStore.current.entries.length === 2);
-    htmlSvc.fetch = async () => new Response('<html><app-root></app-root></html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
+    try { await publicSvc.syncLeaderboard(publicStore); } catch (err) { httpErr = err; }
+    check('HTTP error keeps the last snapshot', httpErr && httpErr.kind === 'http' && publicStore.current.entries.length === 2);
+    publicSvc.fetch = async () => new Response('<html><app-root></app-root></html>', { status: 200, headers: { 'Content-Type': 'text/html' } });
     let malErr = null;
-    try { await htmlSvc.syncLeaderboard(htmlStore); } catch (err) { malErr = err; }
-    check('malformed BotRix HTML is rejected and cache is kept', malErr && malErr.kind === 'schema' && htmlStore.current.entries[0].username === 'high');
-    const pub = htmlSvc.publicPeriod(htmlStore, 'current');
+    try { await publicSvc.syncLeaderboard(publicStore); } catch (err) { malErr = err; }
+    check('malformed BotRix JSON is rejected and cache is kept', malErr && malErr.kind === 'schema' && publicStore.current.entries[0].username === 'high');
+    const pub = publicSvc.publicPeriod(publicStore, 'current');
     check('stale public payload has no secrets', pub.stale === true && pub.source === 'botrix' && !JSON.stringify(pub).includes('secret-key'));
-    check('getBotrixLeaderboard matches publicPeriod', htmlSvc.getBotrixLeaderboard(htmlStore, 'current').entries[0].username === 'high');
+    check('getBotrixLeaderboard matches publicPeriod', publicSvc.getBotrixLeaderboard(publicStore, 'current').entries[0].username === 'high');
 
     console.log('Old account data');
     check('startup warns that the data file still holds account data', /still holds old visitor-account data/.test(logs));

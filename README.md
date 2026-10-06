@@ -67,10 +67,10 @@ docs/                  design notes, AWS_DEPLOYMENT.md, AUTH_REMOVAL_REPORT.md
 | `KICK_CHANNEL_USERNAME` | `norochan` | Public Kick channel for live/offline status |
 | `KICK_CLIENT_ID` / `KICK_CLIENT_SECRET` | none | Kick OAuth. Enables **Connect Kick** on Account and Kick sign-in |
 | `KICK_REDIRECT_URI` | `{BASE_URL}/auth/kick/callback` | Must match a redirect URL in the Kick developer app. Localhost uses `http://localhost:PORT/auth/kick/callback` automatically |
-| `BOTRIX_LEADERBOARD_URL` | none | Optional issued BotRix JSON endpoint. If unset, the public leaderboard page is fetched server-side |
-| `BOTRIX_API_KEY` / `BOTRIX_API_KEY_HEADER` | none / `Authorization` | Key from BotRix, if they issue one. Server-side only |
-| `BOTRIX_PUBLIC` / `BOTRIX_PUBLIC_URL` | `1` / `https://botrix.live/k/{channel}/leaderboard` | Public page fallback. Set `BOTRIX_PUBLIC=0` to disable |
-| `BOTRIX_WATCHTIME_UNIT` | `minutes` on public fallback, else none | `seconds`, `minutes` or `hours`; empty hides numeric watch time from JSON |
+| `BOTRIX_LEADERBOARD_URL` | none | Optional issued BotRix JSON endpoint. If unset, the official public JSON API is used |
+| `BOTRIX_API_KEY` / `BOTRIX_API_KEY_HEADER` | none / `Authorization` | Key from BotRix, if they issue one. Server-side only. Not used for the public API |
+| `BOTRIX_PUBLIC` / `BOTRIX_PUBLIC_URL` | `1` / `https://botrix.live/api/public/leaderboard?platform={platform}&user={channel}` | Official public JSON API. Set `BOTRIX_PUBLIC=0` to disable |
+| `BOTRIX_WATCHTIME_UNIT` | `minutes` on the public API, else none | `seconds`, `minutes` or `hours`; empty hides numeric watch time from JSON |
 | `BOTRIX_TOP` / `BOTRIX_SYNC_MS` | `10` / `900000` | Rows shown / sync interval (min 5 min) |
 
 All variables are listed with placeholders in `.env.example`.
@@ -98,14 +98,14 @@ Copy `src/data/rewards.example.json` to `src/data/rewards.json` (or the `REWARDS
 The "Top viewers" card ranks Kick viewers by BotRix watch time. Current standings come from BotRix; previous month is a snapshot the site froze at month end. BotRix itself does not publish a history endpoint.
 
 **Setup**
-1. Restart the site. By default the server fetches `https://botrix.live/k/norochan/leaderboard` every 15 minutes and caches the result in `data.json`.
-2. If BotRix support issued a JSON endpoint and key, set `BOTRIX_LEADERBOARD_URL` (and `BOTRIX_API_KEY`, `BOTRIX_WATCHTIME_UNIT` if applicable). That official source is used instead of the public page.
+1. Restart the site. By default the server fetches `https://botrix.live/api/public/leaderboard?platform=kick&user=norochan` every 15 minutes and caches the result in `data.json`.
+2. If BotRix support issued a JSON endpoint and key, set `BOTRIX_LEADERBOARD_URL` (and `BOTRIX_API_KEY`, `BOTRIX_WATCHTIME_UNIT` if applicable). That source is used instead of the public API.
 3. Set `BOTRIX_PUBLIC=0` to turn the board off until an issued endpoint is configured.
 4. Reset BotRix rankings at the start of each month if you want "Current" to mean this calendar month. BotRix totals are cumulative since the last reset.
 
 **How it works**: the Node process syncs on a timer and stores results in `data.json` under `viewerLeaderboard`. Visitors read `GET /api/viewers/current`, `GET /api/viewers/previous`, or `GET /api/botrix/leaderboard`. They never call BotRix. Failures keep the last good snapshot. Keys never leave the server.
 
-**Limitations**: BotRix only counts watch time for viewers active in chat; there is no BotRix history API; the public page may be blocked by Cloudflare, in which case the last snapshot stays on screen. No data is ever estimated or invented.
+**Limitations**: BotRix only counts watch time for viewers active in chat; there is no BotRix history API. Empty lists, timeouts, and API errors keep the last good snapshot (or an honest empty state). No data is ever estimated or invented.
 
 ## KICK API limitation: exact viewer watch-time leaderboard is not officially supported
 The official KICK public docs provide OAuth 2.1 flows, public channel/livestream endpoints, and webhook event payloads for chat, follows, subscriptions, rewards, and livestream status. They do not provide an official documented endpoint or webhook for:
