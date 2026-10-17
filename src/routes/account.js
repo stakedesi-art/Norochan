@@ -88,9 +88,9 @@ async function handleAccount(req, res, url) {
     try {
       const email = accounts.consumeVerifyLink(token);
       const row = accounts.markVerified(email);
-      return redirect(res, '/#/account', { 'Set-Cookie': accounts.startSession(req, row) });
+      return redirect(res, '/account', { 'Set-Cookie': accounts.startSession(req, row) });
     } catch {
-      return redirect(res, '/#/account?auth=expired');
+      return redirect(res, '/account?auth=expired');
     }
   }
 
@@ -100,14 +100,14 @@ async function handleAccount(req, res, url) {
   if (route === 'GET /auth/google/callback') {
     try {
       const row = await oauth.googleFinish(url.searchParams.get('code'), url.searchParams.get('state'));
-      return redirect(res, '/#/account', { 'Set-Cookie': accounts.startSession(req, row) });
+      return redirect(res, '/account', { 'Set-Cookie': accounts.startSession(req, row) });
     } catch {
-      return redirect(res, '/#/account?auth=google-error');
+      return redirect(res, '/account?auth=google-error');
     }
   }
   if (route === 'GET /auth/kick/connect') {
     const row = accounts.accountFromReq(req);
-    if (!row) return redirect(res, '/#/account');
+    if (!row) return redirect(res, '/account');
     return redirect(res, oauth.kickAuthUrl({ accountId: row.id }, req));
   }
   if (route === 'GET /auth/kick') {
@@ -117,11 +117,11 @@ async function handleAccount(req, res, url) {
     try {
       const out = await oauth.kickFinish(url.searchParams.get('code'), url.searchParams.get('state'));
       const row = out.row || out;
-      const dest = out.connected ? '/#/account?auth=kick-ok' : '/#/account';
+      const dest = out.connected ? '/account?auth=kick-ok' : '/account';
       return redirect(res, dest, { 'Set-Cookie': accounts.startSession(req, row) });
     } catch (err) {
       const flag = err && err.status === 409 ? 'kick-taken' : 'kick-error';
-      return redirect(res, '/#/account?auth=' + flag);
+      return redirect(res, '/account?auth=' + flag);
     }
   }
   if (route === 'POST /api/auth/kick/test-link' && AUTH_TEST) {

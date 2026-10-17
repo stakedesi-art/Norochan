@@ -79,7 +79,7 @@
         const session = await api('/api/admin/session');
         if (gen !== bootGen) return;
         if (!session.staff) {
-          setNote(status, 'Password accepted, but the staff cookie was not kept. Open this page at http://127.0.0.1:3000/studio.html and try again.', true);
+          setNote(status, 'Password accepted, but the staff cookie was not kept. Open this page at http://127.0.0.1:3000/studio and try again.', true);
           return;
         }
         state.categories = session.categories || [];
@@ -99,8 +99,7 @@
         class: 'btn small secondary', type: 'button',
         onclick: () => {
           state.editingBenefitId = row.id;
-          if (location.hash !== '#/benefits') location.hash = '#/benefits';
-          if (renderDash) renderDash();
+          goStudio('benefits');
         },
       }, 'Edit'));
     }
@@ -494,9 +493,42 @@
     { id: 'chat', label: 'Chat', title: 'Chat', hint: 'Community stays on Discord and Telegram.' },
   ];
 
+  const STUDIO_ROOT = '/studio';
+
+  function normalizePathname(pathname) {
+    const p = String(pathname || '/');
+    return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p || '/';
+  }
+
+  function knownPage(id) {
+    return PAGES.some((page) => page.id === id);
+  }
+
+  function pageFromPath(pathname) {
+    const p = normalizePathname(pathname);
+    if (p === STUDIO_ROOT || p === '/studio.html') return 'users';
+    if (p.startsWith(STUDIO_ROOT + '/')) {
+      const id = p.slice(STUDIO_ROOT.length + 1).split('/')[0];
+      return knownPage(id) ? id : 'users';
+    }
+    return 'users';
+  }
+
+  function studioPath(id) {
+    return STUDIO_ROOT + '/' + (knownPage(id) ? id : 'users');
+  }
+
   function parsePage() {
-    const id = String(location.hash || '').replace(/^#\/?/, '').split('?')[0];
-    return PAGES.some((page) => page.id === id) ? id : 'users';
+    return pageFromPath(location.pathname);
+  }
+
+  function goStudio(id, { replace = false } = {}) {
+    const next = studioPath(id);
+    if (normalizePathname(location.pathname) !== next) {
+      if (replace) history.replaceState(null, '', next);
+      else history.pushState(null, '', next);
+    }
+    if (renderDash) renderDash();
   }
 
   function pageBody(id, refresh) {
@@ -521,7 +553,7 @@
     const pending = (state.accounts || []).filter((row) => row.codeStatus === 'pending').length;
     return h('nav', { class: 'studio-nav', 'aria-label': 'Studio sections' },
       PAGES.map((page) => h('a', {
-        href: '#/' + page.id,
+        href: '/studio/' + page.id,
         class: 'studio-nav-link' + (current === page.id ? ' is-active' : ''),
         'aria-current': current === page.id ? 'page' : null,
       }, page.label, page.id === 'checks' && pending > 0 ? h('span', { class: 'studio-nav-count' }, String(pending)) : null)));
@@ -561,7 +593,10 @@
           pageBody(id, refresh))));
     }
     renderDash = render;
-    if (!location.hash) location.hash = '#/users';
+    const id = parsePage();
+    if (normalizePathname(location.pathname) !== studioPath(id)) {
+      history.replaceState(null, '', studioPath(id));
+    }
     render();
   }
 
@@ -591,6 +626,18 @@
       loginView();
     });
   }
-  window.addEventListener('hashchange', () => { if (renderDash) renderDash(); });
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest && event.target.closest('a[href]');
+    if (!link || (link.target && link.target !== '_self')) return;
+    let url;
+    try { url = new URL(link.href, location.href); } catch { return; }
+    if (url.origin !== location.origin) return;
+    const p = normalizePathname(url.pathname);
+    if (p !== STUDIO_ROOT && p !== '/studio.html' && !p.startsWith(STUDIO_ROOT + '/')) return;
+    event.preventDefault();
+    goStudio(pageFromPath(p));
+  });
+  window.addEventListener('popstate', () => { if (renderDash) renderDash(); });
   boot();
 })();

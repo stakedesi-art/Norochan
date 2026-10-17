@@ -117,7 +117,9 @@
   };
   const stopMoneyRain = () => {
     if (moneyRainRaf) { cancelAnimationFrame(moneyRainRaf); moneyRainRaf = null; }
+    document.querySelectorAll('.norochan-money-burst').forEach((el) => el.remove());
   };
+  const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const WHEEL_SLICE_COLORS = ['#0a3a42', '#061c22', '#0e5560', '#082830', '#125e6a', '#041418', '#0c4852', '#163e48'];
 
@@ -617,7 +619,7 @@
           h('p', { class: 'muted' }, 'Rewarding players who wager under the code.')),
         tabs),
       body,
-      h('div', { class: 'board-foot' }, h('a', { class: 'btn small secondary', href: '#/leaderboard' }, 'View full leaderboard'))
+      h('div', { class: 'board-foot' }, h('a', { class: 'btn small secondary', href: '/leaderboard' }, 'View full leaderboard'))
     );
     load();
     return panel;
@@ -1173,9 +1175,43 @@
 
   const MONEY_ICONS = ['💲', '💎', '🎁', '💶', '💸'];
 
+  function spawnMoneyPixels(layer, clientX, clientY) {
+    if (prefersReducedMotion() || !layer.isConnected) return;
+    const layerBox = layer.getBoundingClientRect();
+    const burst = document.createElement('div');
+    burst.className = 'norochan-money-burst';
+    burst.setAttribute('aria-hidden', 'true');
+    burst.style.left = (clientX - layerBox.left) + 'px';
+    burst.style.top = (clientY - layerBox.top) + 'px';
+    const count = 12 + Math.floor(Math.random() * 13);
+    const colors = ['#00e5ff', '#67e8f9', '#22d3ee', '#0891b2'];
+    let remaining = count;
+    const removeBurst = () => { if (burst.isConnected) burst.remove(); };
+    for (let i = 0; i < count; i++) {
+      const pixel = document.createElement('span');
+      pixel.className = 'norochan-money-pixel';
+      const angle = ((Math.PI * 2) * i) / count + (Math.random() - 0.5) * 0.8;
+      const dist = 12 + Math.random() * 26;
+      pixel.style.setProperty('--dx', (Math.cos(angle) * dist).toFixed(1) + 'px');
+      pixel.style.setProperty('--dy', (Math.sin(angle) * dist).toFixed(1) + 'px');
+      pixel.style.setProperty('--s', (2 + Math.random() * 3).toFixed(1) + 'px');
+      pixel.style.setProperty('--dur', (260 + Math.floor(Math.random() * 220)) + 'ms');
+      pixel.style.setProperty('--delay', Math.floor(Math.random() * 40) + 'ms');
+      pixel.style.background = colors[i % colors.length];
+      burst.append(pixel);
+    }
+    burst.addEventListener('animationend', (event) => {
+      if (!event.target.classList.contains('norochan-money-pixel')) return;
+      remaining -= 1;
+      if (remaining <= 0) removeBurst();
+    });
+    layer.append(burst);
+    setTimeout(removeBurst, 700);
+  }
+
   function bindMoneyCursor(layer) {
     const notes = [...layer.querySelectorAll('.norochan-money-note-push')].map((el) => ({
-      el, x: 0, y: 0, vx: 0, vy: 0,
+      el, x: 0, y: 0, vx: 0, vy: 0, lastX: null, lastY: null, burst: false,
     }));
     let mx = null;
     let my = null;
@@ -1201,6 +1237,7 @@
     const tick = () => {
       if (!layer.isConnected) { moneyRainRaf = null; return; }
       if (mx != null) impulse(mx, my, 1.6);
+      const layerBox = layer.getBoundingClientRect();
       notes.forEach((note) => {
         note.vx *= 0.9;
         note.vy *= 0.9;
@@ -1210,9 +1247,33 @@
         note.y = Math.max(-90, Math.min(90, note.y));
         note.el.style.setProperty('--push-x', note.x.toFixed(2) + 'px');
         note.el.style.setProperty('--push-y', note.y.toFixed(2) + 'px');
+        const box = note.el.getBoundingClientRect();
+        const cx = box.left + box.width / 2;
+        const cy = box.top + box.height / 2;
+        const clipped = box.top > layerBox.bottom - 2;
+        const jumped = note.lastY != null && cy < note.lastY - 160;
+        if ((clipped || jumped) && !note.burst && note.lastX != null) {
+          spawnMoneyPixels(layer, note.lastX, note.lastY);
+          note.burst = true;
+        } else if (!clipped && !jumped) {
+          note.lastX = cx;
+          note.lastY = cy;
+          if (note.burst && cy > layerBox.top + 80) note.burst = false;
+        }
       });
       moneyRainRaf = requestAnimationFrame(tick);
     };
+    layer.querySelectorAll('.norochan-money-note').forEach((noteEl, i) => {
+      noteEl.addEventListener('animationiteration', () => {
+        const note = notes[i];
+        if (!note || note.burst || note.lastX == null) return;
+        const layerBox = layer.getBoundingClientRect();
+        if (note.lastY > layerBox.bottom - 160) {
+          spawnMoneyPixels(layer, note.lastX, note.lastY);
+          note.burst = true;
+        }
+      });
+    });
     const stage = layer.closest('.hero-stage') || layer.parentElement;
     if (stage) {
       stage.addEventListener('pointermove', onMove, { passive: true });
@@ -1232,7 +1293,7 @@
       const push = h('div', { class: 'norochan-money-note-push' }, face);
       layer.append(h('div', { class: 'norochan-money-note norochan-money-note--' + depths[i % depths.length] }, push));
     }
-    queueMicrotask(() => bindMoneyCursor(layer));
+    bindMoneyCursor(layer);
     return layer;
   }
 
@@ -1286,7 +1347,7 @@
           h('span', { class: 'code' }, c.code || 'Norochan')),
         h('div', { class: 'promo-actions' },
           copyBtn,
-          h('a', { class: 'btn small', href: c.referralUrl || '#/', target: '_blank', rel: 'noopener sponsored' }, 'Join now'),
+          h('a', { class: 'btn small', href: c.referralUrl || '/', target: '_blank', rel: 'noopener sponsored' }, 'Join now'),
           copyMsg)),
       h('section', { class: 'race-card' },
         decor('decor-race', [['trophy', 's-trophy'], ['hourglass', 's-glass'], ['star', 's-star']]),
@@ -1294,14 +1355,14 @@
         h('h2', {}, race.title || 'Wager race'),
         h('p', { class: 'muted' }, formatRaceWindow(race) || 'Dates publish with the race config.'),
         race.startsAt ? countdownBox(race) : null,
-        h('a', { class: 'btn small secondary', href: '#/leaderboard' }, 'View standings')));
+        h('a', { class: 'btn small secondary', href: '/leaderboard' }, 'View standings')));
     return h('div', { class: 'page-shell' },
       h('section', { class: 'hero-stage', 'data-spy': 'home' },
         moneyRain,
         h('div', { class: 'hero-welcome' },
           h('p', { class: 'hero-welcome-kicker' }, 'Welcome to'),
           h('div', { class: 'hero-welcome-collab' },
-            h('img', { class: 'brand-mark hero-welcome-mark', src: '/img/norochan-logo.png', alt: '', width: 96, height: 96 }),
+            h('img', { class: 'brand-mark hero-welcome-mark', src: '/img/norochan-logo.png', alt: '', width: 96, height: 96, fetchpriority: 'high', decoding: 'async' }),
             h('span', { class: 'hero-welcome-x', 'aria-hidden': 'true' }, '×'),
             h('span', { class: 'hero-welcome-stake' }, 'Stake')),
           h('h1', {}, 'Norochan'),
@@ -1370,7 +1431,7 @@
   }
 
   function extraBonusPanel() {
-    return h('a', { class: 'lb-bonus', href: '#/benefits' },
+    return h('a', { class: 'lb-bonus', href: '/code-benefits' },
       h('span', { class: 'eyebrow' }, 'Extra bonus'),
       h('h2', {}, 'Code benefits'),
       h('p', {}, 'Affiliate extras on top of the race prizes. Open Code benefits for the current rewards.'),
@@ -1379,7 +1440,7 @@
 
   function codeSignupCta() {
     const code = (state.config && state.config.code) || 'Norochan';
-    const href = (state.config && state.config.referralUrl) || '#/';
+    const href = (state.config && state.config.referralUrl) || '/';
     return h('section', { class: 'lb-code-cta' },
       h('p', { class: 'muted' }, 'Want to compete for this month’s prizes?'),
       h('a', { class: 'lb-code-btn', href, target: '_blank', rel: 'noopener sponsored' }, 'Sign up with code: ' + code));
@@ -1536,7 +1597,7 @@
 
   function accountView() {
     const wrap = h('div', { class: 'account-page' });
-    const authErr = new URLSearchParams(String(location.hash).split('?')[1] || '').get('auth');
+    const authErr = new URLSearchParams(location.search).get('auth');
     const flash = authErr === 'expired'
       ? 'That confirmation link expired. Sign up again or resend it.'
       : authErr === 'kick-ok' ? 'Kick username connected.'
@@ -1668,16 +1729,57 @@
 
   const pageNames = { home: 'Home', leaderboard: 'Leaderboard', support: 'Support', wheel: 'Wheel', benefits: 'Code benefits', announcements: 'Announcement', streams: 'Streams', community: 'Community', account: 'Account' };
   const homeSections = { wheel: 'wheel', benefits: 'benefits', announcements: 'announcements', streams: 'streams', community: 'community', support: 'support' };
+  const ROUTE_PATH = {
+    home: '/',
+    leaderboard: '/leaderboard',
+    wheel: '/wheel',
+    benefits: '/code-benefits',
+    announcements: '/announcement',
+    community: '/community',
+    support: '/support',
+    account: '/account',
+    streams: '/',
+  };
+  const PATH_ROUTE = {
+    '': 'home',
+    '/': 'home',
+    leaderboard: 'leaderboard',
+    wheel: 'wheel',
+    'code-benefits': 'benefits',
+    benefits: 'benefits',
+    announcement: 'announcements',
+    announcements: 'announcements',
+    community: 'community',
+    support: 'support',
+    account: 'account',
+    streams: 'streams',
+  };
 
   let currentView = null;
+  let routeGen = 0;
   let spyFrame = 0;
   const siteHeader = document.querySelector('.site-header');
   const scrollBehavior = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
-  const parseHash = (hash) => (String(hash || '').replace(/^#\/?/, '') || 'home').split('?')[0];
+
+  function normalizePathname(pathname) {
+    const p = String(pathname || '/');
+    return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p || '/';
+  }
+  function pathToRoute(pathname) {
+    const p = normalizePathname(pathname);
+    const key = p === '/' ? '/' : p.replace(/^\//, '');
+    return Object.prototype.hasOwnProperty.call(PATH_ROUTE, key) ? PATH_ROUTE[key] : null;
+  }
+  function routePath(name) {
+    return ROUTE_PATH[name] || '/';
+  }
+  function currentRouteName() {
+    return pathToRoute(location.pathname);
+  }
 
   function setActiveNav(key) {
     for (const a of document.querySelectorAll('[data-route]')) {
-      if (a.dataset.route === key) a.setAttribute('aria-current', 'page');
+      if (key && a.dataset.route === key) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     }
   }
@@ -1761,6 +1863,11 @@
     const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
     progressBar.style.transform = 'scaleX(' + (maxScroll > 0 ? Math.min(1, window.scrollY / maxScroll) : 0).toFixed(4) + ')';
     if (currentView !== 'home') return;
+    const pinned = currentRouteName();
+    if (pinned && homeSections[pinned]) {
+      setActiveNav(pinned);
+      return;
+    }
     const marks = [...app.querySelectorAll('[data-spy]')];
     if (!marks.length) return;
     const line = (siteHeader ? siteHeader.offsetHeight : 72) + window.innerHeight * 0.3;
@@ -1772,21 +1879,67 @@
   }
   window.addEventListener('scroll', () => { if (!spyFrame) spyFrame = requestAnimationFrame(updateScrollSpy); }, { passive: true });
 
+  function appUrlFromAnchor(anchor) {
+    if (!anchor || (anchor.target && anchor.target !== '_self')) return null;
+    if (anchor.hasAttribute('download')) return null;
+    const href = anchor.getAttribute('href');
+    if (!href || /^(mailto:|tel:|javascript:)/i.test(href)) return null;
+    let url;
+    try { url = new URL(anchor.href, location.href); } catch { return null; }
+    if (url.origin !== location.origin) return null;
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return null;
+    if (url.pathname === '/studio' || url.pathname === '/studio.html' || url.pathname.startsWith('/studio/')) return null;
+    if (/\.[a-z0-9]+$/i.test(url.pathname)) return null;
+    return url;
+  }
+
+  function go(url, { replace = false } = {}) {
+    const next = url.pathname + url.search;
+    const here = location.pathname + location.search;
+    const name = pathToRoute(url.pathname);
+    if (next !== here) {
+      if (replace) history.replaceState(null, '', next);
+      else history.pushState(null, '', next);
+    } else if (name && (currentView === name || (currentView === 'leaderboard' && name === 'leaderboard') || (currentView === 'account' && name === 'account'))) {
+      if (currentView === 'home' && (homeSections[name] || name === 'home')) scrollHomeTo(name);
+      return;
+    }
+    if (currentView === 'home' && name && (homeSections[name] || name === 'home') && app.querySelector('[data-spy]')) {
+      scrollHomeTo(name);
+      return;
+    }
+    route();
+  }
+
   document.addEventListener('click', (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const link = event.target.closest && event.target.closest('a[href^="#/"]');
-    if (!link || currentView !== 'home') return;
-    const name = parseHash(link.getAttribute('href'));
-    if (name !== 'home' && !homeSections[name]) return;
+    const link = event.target.closest && event.target.closest('a[href]');
+    const url = appUrlFromAnchor(link);
+    if (!url) return;
+    if (url.hash && normalizePathname(url.pathname) === normalizePathname(location.pathname) && url.search === location.search) return;
     event.preventDefault();
-    if (location.hash !== link.getAttribute('href')) history.pushState(null, '', link.getAttribute('href'));
-    scrollHomeTo(name);
+    go(url);
   });
 
+  function unknownView() {
+    const path = (location.pathname || '/') + (location.search || '');
+    return h('div', { class: 'not-found', role: 'status' },
+      h('div', { class: 'not-found-panel' },
+        h('span', { class: 'eyebrow' }, 'Lost signal'),
+        h('p', { class: 'not-found-code', 'aria-hidden': 'true' }, '404'),
+        h('h1', {}, 'Page not found'),
+        h('p', { class: 'muted' }, 'This address is not on Norochan. Check the link, or jump back to a live page.'),
+        h('p', { class: 'not-found-path' }, path),
+        h('div', { class: 'not-found-actions' },
+          h('a', { class: 'btn', href: '/' }, 'Back to home'),
+          h('a', { class: 'btn secondary', href: '/leaderboard' }, 'Leaderboard'))));
+  }
+
   async function route() {
-    const name = parseHash(location.hash);
-    const section = homeSections[name];
-    if (currentView === 'home' && (section || name === 'home') && app.querySelector('[data-spy]')) {
+    const gen = ++routeGen;
+    const name = currentRouteName();
+    const section = name && homeSections[name];
+    if (currentView === 'home' && name && (section || name === 'home') && app.querySelector('[data-spy]')) {
       scrollHomeTo(name);
       return;
     }
@@ -1795,21 +1948,44 @@
     stopViewerPoll();
     stopWheelPoll();
     stopMoneyRain();
+    if (!name) {
+      currentView = 'unknown';
+      setActiveNav(null);
+      const announcer = document.getElementById('route-announcer');
+      if (announcer) announcer.textContent = 'Page not found';
+      app.replaceChildren(unknownView());
+      document.body.classList.remove('is-home');
+      document.body.classList.add('is-unknown');
+      window.scrollTo(0, 0);
+      return;
+    }
+    const canonical = routePath(name);
+    if (name !== 'streams' && canonical && normalizePathname(location.pathname) !== canonical) {
+      history.replaceState(null, '', canonical + location.search);
+    }
     setActiveNav(section || (['leaderboard', 'account'].includes(name) ? name : 'home'));
     const announcer = document.getElementById('route-announcer');
     if (announcer) announcer.textContent = pageNames[name] || pageNames.home;
     if (name === 'leaderboard') { currentView = 'leaderboard'; await leaderboardView(); }
     else if (name === 'account') { currentView = 'account'; app.replaceChildren(accountView()); }
     else { currentView = 'home'; app.replaceChildren(homeView()); }
+    if (gen !== routeGen) return;
     document.body.classList.toggle('is-home', currentView === 'home');
+    document.body.classList.remove('is-unknown');
     refreshTabIndicators();
     if (document.activeElement === document.body) {
       try { app.focus({ preventScroll: true }); } catch { app.focus(); }
     }
     initReveal();
-    if (section) scrollHomeTo(name);
-    else window.scrollTo(0, 0);
-    if (!section) updateScrollSpy();
+    if (section) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (gen !== routeGen) return;
+        scrollHomeTo(name);
+      }));
+    } else {
+      window.scrollTo(0, 0);
+      updateScrollSpy();
+    }
   }
 
   function paintNavAccount(me) {
@@ -1852,7 +2028,7 @@
   }
 
   async function init() {
-    const rewards = api('/api/rewards').catch(() => null);
+    const rewardsP = api('/api/rewards').catch(() => null);
     try { state.config = await api('/api/config'); }
     catch {
       app.replaceChildren(UI.errorState
@@ -1862,11 +2038,13 @@
     }
     document.title = state.config.name;
     api('/api/me').then((me) => { state.me = me; paintNavAccount(me); }).catch(() => paintNavAccount(null));
-    state.rewards = await rewards;
-    pollNavLive();
-    setInterval(pollNavLive, 45000);
-    window.addEventListener('hashchange', route);
+    window.addEventListener('popstate', () => { route(); });
     route();
+    rewardsP.then((rewards) => {
+      state.rewards = rewards;
+      const bonuses = document.getElementById('bonuses');
+      if (currentView === 'home' && bonuses) bonuses.replaceWith(bonusesGivenSection());
+    });
   }
   init();
 })();

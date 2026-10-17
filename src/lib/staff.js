@@ -1,5 +1,5 @@
 'use strict';
-// Staff session for /studio.html. One env password. No public user accounts (SRS Phase 1).
+// Staff session for /studio. One env password. No public user accounts (SRS Phase 1).
 const crypto = require('crypto');
 const { HSTS } = require('../config');
 const { HttpError } = require('./http');

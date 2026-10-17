@@ -29,7 +29,7 @@ function main() {
     if (botrix.configError && !botrix.configured) console.error(`[botrix] ${botrix.configError} Top viewers board disabled.`);
     else console.log(`BotRix leaderboard: ${botrix.configured ? `on, sync every ${Math.round(botrix.syncMs / 60000)} min` : 'off (set BOTRIX_LEADERBOARD_URL or BOTRIX_PUBLIC=1, see README)'}`);
     console.log(`Rewards file: ${REWARDS_FILE}`);
-    console.log(`Staff studio: ${staff.configured() ? 'on (/studio.html)' : 'off (set ADMIN_PASSWORD, 8+ characters)'}`);
+    console.log(`Staff studio: ${staff.configured() ? 'on (/studio)' : 'off (set ADMIN_PASSWORD, 8+ characters)'}`);
     console.log(`Wheel Discord post: ${process.env.DISCORD_WHEEL_WEBHOOK ? 'on' : 'off (set DISCORD_WHEEL_WEBHOOK)'}`);
     console.log(`Visitor login: email+password (Gmail confirm). Google: ${process.env.GOOGLE_CLIENT_ID ? 'on' : 'off'} · Kick OAuth: ${process.env.KICK_CLIENT_ID ? 'on · callback ' + KICK_REDIRECT_URI : 'off'}`);
   });

@@ -909,6 +909,77 @@ html { font-synthesis: weight none; }
   .wheel-announce { transition: none; }
 }
 
+.not-found {
+  display: grid;
+  place-items: center;
+  min-height: min(72vh, 640px);
+  padding: 48px 16px 80px;
+  text-align: center;
+}
+.not-found-panel {
+  position: relative;
+  width: min(100%, 34rem);
+  padding: 40px 28px 36px;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow), 0 0 48px rgba(0, 229, 255, 0.08);
+}
+.not-found-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--primary-gradient);
+}
+.not-found-code {
+  margin: 4px 0 10px;
+  font-family: var(--font-display);
+  font-size: clamp(5rem, 16vw, 7.5rem);
+  font-weight: 800;
+  line-height: 0.85;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  text-shadow: 0 0 32px rgba(0, 229, 255, 0.4);
+}
+.not-found h1 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  text-shadow: 0 0 28px rgba(0, 229, 255, 0.28);
+}
+.not-found .muted { max-width: 42ch; margin-left: auto; margin-right: auto; }
+.not-found-path {
+  display: inline-block;
+  max-width: 100%;
+  margin: 8px 0 22px;
+  padding: 6px 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(0, 229, 255, 0.06);
+  color: var(--primary);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.85rem;
+}
+.not-found-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+@media (max-width: 720px) {
+  .not-found { padding: 32px 12px 64px; }
+  .not-found-panel { padding: 32px 18px 28px; }
+  .not-found-actions .btn { width: 100%; }
+}
+
 .page-intro { text-align: center; }
 .page-intro .eyebrow {
   background: transparent;
@@ -1249,6 +1320,30 @@ body.is-home {
   animation-direction: reverse;
 }
 
+.norochan-money-burst {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.norochan-money-pixel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--s, 3px);
+  height: var(--s, 3px);
+  margin: calc(var(--s, 3px) / -2) 0 0 calc(var(--s, 3px) / -2);
+  pointer-events: none;
+  background: #00e5ff;
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.55);
+  animation: norochan-money-pixel-out var(--dur, 380ms) var(--delay, 0ms) ease-out forwards;
+}
+@keyframes norochan-money-pixel-out {
+  from { transform: translate3d(0, 0, 0); opacity: 1; }
+  to { transform: translate3d(var(--dx), var(--dy), 0); opacity: 0; }
+}
+
 @media (max-width: 1100px) {
   .norochan-money-note-face { font-size: 36px; }
   .norochan-money-note--bg .norochan-money-note-face { font-size: 30px; }
@@ -1280,4 +1375,5 @@ body.is-home {
     animation: none;
   }
   .page-shell .hero-welcome h1 { text-shadow: 0 0 28px rgba(0, 229, 255, 0.4); }
+  .norochan-money-burst { display: none; }
 }

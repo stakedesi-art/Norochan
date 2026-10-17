@@ -120,6 +120,14 @@ async function main() {
     check('Kick live payload has the fields the live card uses', ['status', 'channel', 'title', 'viewers', 'thumbnail', 'url'].every((k) => k in kickLive.json));
     const home = record(await call('GET', '/'));
     check('home page served with CSP header', home.status === 200 && /<title>Norochan/.test(home.text) && !!home.headers.get('content-security-policy'));
+    check('public HTML uses clean nav hrefs', /href="\/leaderboard"/.test(home.text) && /href="\/code-benefits"/.test(home.text) && /href="\/announcement"/.test(home.text) && /href="\/account"/.test(home.text) && !/href="#\/leaderboard"/.test(home.text));
+    for (const p of ['/leaderboard', '/wheel', '/code-benefits', '/announcement', '/community', '/support', '/account']) {
+      const page = record(await call('GET', p));
+      check('SPA ' + p + ' serves the app HTML', page.status === 200 && /<title>Norochan/.test(page.text) && /\/app\.js/.test(page.text) && /text\/html/.test(String(page.headers.get('content-type') || '')));
+    }
+    check('unknown public path still serves the app shell', (await call('GET', '/no-such-noro-page')).status === 200 && /\/app\.js/.test((await call('GET', '/no-such-noro-page')).text));
+    check('missing CSS asset stays 404', (await call('GET', '/css/not-a-real-file.css')).status === 404);
+    check('API JSON is not rewritten to HTML', (await call('GET', '/api/config')).json && (await call('GET', '/api/config')).json.name === 'Norochan');
     check('path traversal blocked', [403, 404].includes((await call('GET', '/..%2fserver.js')).status));
     check('data.json not exposed', (await call('GET', '/data.json')).status === 404);
 
@@ -129,6 +137,7 @@ async function main() {
     const appJs = record(await call('GET', '/app.js'));
     check('public site has no dark/light theme button', !/id="theme"|theme-mobile|Switch to light theme/.test(home.text) && !/toggleTheme|theme-desktop/.test(appJs.text));
     check('front end never calls old signup or staff-admin APIs', appJs.status === 200 && !/\/api\/(login|signup|profile|connect-provider)|NoroAdmin|#\/admin/.test(appJs.text) && /\/api\/me/.test(appJs.text) && /\/api\/auth\/signup/.test(appJs.text) && /\/api\/verify\/claim/.test(appJs.text) && !/\/api\/verify\/challenge/.test(appJs.text));
+    check('public app uses History API path routing', /addEventListener\('popstate'/.test(appJs.text) && /history\.pushState/.test(appJs.text) && !/consumeLegacyHash/.test(appJs.text) && !/addEventListener\('hashchange'/.test(appJs.text) && !/location\.hash/.test(appJs.text));
     check('public feed is wired', /\/api\/feed/.test(appJs.text));
     check('public wheel is a live canvas fed by /api/wheel, not hardcoded players', /\/api\/wheel/.test(appJs.text) && /getContext/.test(appJs.text) && /Live draw/.test(appJs.text) && /wheel-countdown/.test(appJs.text) && /strokeText\(label/.test(appJs.text) && !/Alice_W|bobby99|KaiTheGreat/.test(appJs.text) && !/ticketsFromWager/.test(appJs.text));
     check('viewer board keeps podium animation and never fetches BotRix from the browser', /viewerPodium/.test(appJs.text) && /\/api\/viewers\//.test(appJs.text) && /listSkeleton\(3\)/.test(appJs.text) && !/botrix\.live/.test(appJs.text) && !/BOTRIX_API_KEY|BOTRIX_KEY/.test(appJs.text));
@@ -140,6 +149,10 @@ async function main() {
     check('old admin bundle is gone', (await call('GET', '/admin.js')).status === 404 && (await call('GET', '/css/admin.css')).status === 404);
     const studioPage = record(await call('GET', '/studio.html'));
     check('staff studio page is served off the public nav', studioPage.status === 200 && /Norochan studio/.test(studioPage.text) && /noindex/.test(studioPage.text));
+    const studioRoot = record(await call('GET', '/studio'));
+    check('staff studio path serves the studio HTML', studioRoot.status === 200 && /Norochan studio/.test(studioRoot.text) && /\/studio\.js/.test(studioRoot.text) && /noindex/.test(studioRoot.text));
+    const studioUsers = record(await call('GET', '/studio/users'));
+    check('staff studio section path serves the studio HTML', studioUsers.status === 200 && /Norochan studio/.test(studioUsers.text) && /\/studio\.js/.test(studioUsers.text));
     check('GET /api/me is empty when signed out', (await call('GET', '/api/me')).status === 200 && (await call('GET', '/api/me')).json.account === null);
     check('unknown staff paths require a session', (await call('GET', '/api/admin/users')).status === 401);
     for (const p of ['/api/login', '/api/signup', '/api/logout', '/api/profile', '/api/connect-provider']) {
@@ -150,7 +163,7 @@ async function main() {
     check('Google OAuth is off until GOOGLE_CLIENT_ID is set', (await call('GET', '/auth/google')).status === 503);
     check('Kick OAuth is off until KICK_CLIENT_ID is set', (await call('GET', '/auth/kick')).status === 503);
     const kickConnect = await call('GET', '/auth/kick/connect');
-    check('Kick connect without a session goes to Account', kickConnect.status === 302 && /#\/account/.test(String(kickConnect.headers.get('location') || '')));
+    check('Kick connect without a session goes to Account', kickConnect.status === 302 && /\/account/.test(String(kickConnect.headers.get('location') || '')) && !/#\/account/.test(String(kickConnect.headers.get('location') || '')));
 
     console.log('Staff studio (announcements + code benefits)');
     const sess = await call('GET', '/api/admin/session');
@@ -231,7 +244,7 @@ async function main() {
     check('unconfirmed email cannot sign in', stillClosed.status === 403, stillClosed.status);
     const magic = await call('GET', emailReq.json.verifyPath);
     const sid = String(magic.headers.get('set-cookie') || '').split(';')[0];
-    check('confirm link sets an HttpOnly visitor session', magic.status === 302 && /^sid=/.test(sid) && /httponly/i.test(String(magic.headers.get('set-cookie') || '')) && /#\/account/.test(String(magic.headers.get('location') || '')));
+    check('confirm link sets an HttpOnly visitor session', magic.status === 302 && /^sid=/.test(sid) && /httponly/i.test(String(magic.headers.get('set-cookie') || '')) && /\/account/.test(String(magic.headers.get('location') || '')) && !/#\/account/.test(String(magic.headers.get('location') || '')));
     const me = await call('GET', '/api/me', { cookie: sid });
     check('signed-in /api/me shows email and no Stake name yet', me.json.account && me.json.account.email === 'player@example.com' && me.json.account.stakeUser === null);
     const passLogin = await call('POST', '/api/auth/login', { body: { email: 'player@example.com', password: 'longenough1' } });
@@ -316,7 +329,7 @@ async function main() {
     check('studio sends a CSRF header on staff writes', /X-Studio-CSRF/.test(studioJs.text));
     check('studio has a Users list and code-check actions', /\/api\/admin\/users/.test(studioJs.text) && /Users/.test(studioJs.text) && /Kick username/.test(studioJs.text) && /Stake username/.test(studioJs.text) && /\/api\/admin\/accounts/.test(studioJs.text) && /Unbind/.test(studioJs.text) && /Code checks/.test(studioJs.text) && /reviewActions/.test(studioJs.text) && /Under code/.test(studioJs.text));
     check('studio can update existing code-benefit posts', /Update code benefit/.test(studioJs.text) && /editingBenefitId/.test(studioJs.text));
-    check('studio splits each feature onto its own page', /studio-nav/.test(studioJs.text) && /id: 'users'/.test(studioJs.text) && /id: 'checks'/.test(studioJs.text) && /id: 'wheel'/.test(studioJs.text) && /id: 'prizes'/.test(studioJs.text) && /id: 'announcements'/.test(studioJs.text) && /id: 'benefits'/.test(studioJs.text) && /'#\/' \+ page\.id/.test(studioJs.text));
+    check('studio splits each feature onto its own page', /studio-nav/.test(studioJs.text) && /id: 'users'/.test(studioJs.text) && /id: 'checks'/.test(studioJs.text) && /id: 'wheel'/.test(studioJs.text) && /id: 'prizes'/.test(studioJs.text) && /id: 'announcements'/.test(studioJs.text) && /id: 'benefits'/.test(studioJs.text) && /href: '\/studio\/' \+ page\.id/.test(studioJs.text) && !/'#\/' \+ page\.id/.test(studioJs.text) && !/hashchange/.test(studioJs.text) && !/location\.hash/.test(studioJs.text));
     check('studio copy says the draw video posts to Discord', /DISCORD_WHEEL_WEBHOOK/.test(studioJs.text) && /3-winner spin/.test(studioJs.text));
     check('studio Prizes page sets race and Kick viewer pools', /\/api\/admin\/prizes/.test(studioJs.text) && /Wager race prize pool/.test(studioJs.text) && /Kick viewer board prize pool/.test(studioJs.text) && /racePrizes/.test(studioJs.text) && /viewerRewards/.test(studioJs.text) && /Place amounts/.test(studioJs.text) && /Bonuses given so far/.test(studioJs.text) && /leaderboardPayout/.test(studioJs.text) && /levelUpBonus/.test(studioJs.text) && /socialMediaGiveaways/.test(studioJs.text));
     check('staff prize pools reject anonymous PATCH', (await call('PATCH', '/api/admin/prizes', { body: { racePrizePool: 900 } })).status === 401);
