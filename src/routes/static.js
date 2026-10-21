@@ -11,8 +11,8 @@ const TYPES = {
   '.woff2': 'font/woff2',
 };
 const SPA_PATHS = new Set([
-  '/', '/leaderboard', '/wheel', '/code-benefits', '/benefits',
-  '/announcement', '/announcements', '/community', '/support', '/account',
+  '/', '/leaderboard', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/benefits',
+  '/community', '/support', '/account',
 ]);
 const INDEX = path.join(PUBLIC_DIR, 'index.html');
 const STUDIO = path.join(PUBLIC_DIR, 'studio.html');

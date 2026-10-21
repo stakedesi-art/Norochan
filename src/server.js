@@ -7,6 +7,7 @@ const storage = require('./storage');
 const { refreshAll, state } = require('./services/stake');
 const { botrix } = require('./services/viewers');
 const { ensureStore } = require('./services/content');
+const hunts = require('./services/hunts');
 const wheel = require('./services/wheel');
 const accounts = require('./services/accounts');
 const referred = require('./services/referred');
@@ -21,6 +22,7 @@ function main() {
   }
   botrix.ensureStore(storage.db);
   ensureStore();
+  hunts.ensureStore();
   wheel.ensureStore();
   accounts.ensure();
   server.listen(PORT, HOST, () => {

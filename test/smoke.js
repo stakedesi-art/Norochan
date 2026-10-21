@@ -120,8 +120,8 @@ async function main() {
     check('Kick live payload has the fields the live card uses', ['status', 'channel', 'title', 'viewers', 'thumbnail', 'url'].every((k) => k in kickLive.json));
     const home = record(await call('GET', '/'));
     check('home page served with CSP header', home.status === 200 && /<title>Norochan/.test(home.text) && !!home.headers.get('content-security-policy'));
-    check('public HTML uses clean nav hrefs', /href="\/leaderboard"/.test(home.text) && /href="\/code-benefits"/.test(home.text) && /href="\/announcement"/.test(home.text) && /href="\/account"/.test(home.text) && !/href="#\/leaderboard"/.test(home.text));
-    for (const p of ['/leaderboard', '/wheel', '/code-benefits', '/announcement', '/community', '/support', '/account']) {
+    check('public HTML uses clean nav hrefs', /href="\/leaderboard"/.test(home.text) && /href="\/code-benefits"/.test(home.text) && /href="\/account"/.test(home.text) && !/href="\/announcement"/.test(home.text) && !/href="#\/leaderboard"/.test(home.text));
+    for (const p of ['/leaderboard', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/community', '/support', '/account']) {
       const page = record(await call('GET', p));
       check('SPA ' + p + ' serves the app HTML', page.status === 200 && /<title>Norochan/.test(page.text) && /\/app\.js/.test(page.text) && /text\/html/.test(String(page.headers.get('content-type') || '')));
     }
@@ -132,7 +132,7 @@ async function main() {
     check('data.json not exposed', (await call('GET', '/data.json')).status === 404);
 
     console.log('Visitor account (Phase 3)');
-    check('navigation has Wheel, Account chip, code benefits and announcements, not Streams, Rewards, Discord, or Kick offline', /data-route="wheel"/.test(home.text) && /id="nav-account"/.test(home.text) && /data-route="account"/.test(home.text) && /Code benefits/.test(home.text) && /Announcement/.test(home.text) && !/data-route="streams"/.test(home.text) && !/data-route="rewards"/.test(home.text) && !/data-route="discord"/.test(home.text) && !/id="nav-live"|id="nav-discord"/.test(home.text) && !/data-nav-admin|#\/admin|Sign up/i.test(home.text));
+    check('navigation has Wheel, Account chip, and code benefits, not Announcements, Streams, Rewards, Discord, or Kick offline', /data-route="wheel"/.test(home.text) && /id="nav-account"/.test(home.text) && /data-route="account"/.test(home.text) && /Code benefits/.test(home.text) && !/Announcement/.test(home.text) && !/data-route="announcements"/.test(home.text) && !/data-route="streams"/.test(home.text) && !/data-route="rewards"/.test(home.text) && !/data-route="discord"/.test(home.text) && !/id="nav-live"|id="nav-discord"/.test(home.text) && !/data-nav-admin|#\/admin|Sign up/i.test(home.text));
     check('home page does not link to the staff studio', !/studio\.html|studio\.js/.test(home.text));
     const appJs = record(await call('GET', '/app.js'));
     check('public site has no dark/light theme button', !/id="theme"|theme-mobile|Switch to light theme/.test(home.text) && !/toggleTheme|theme-desktop/.test(appJs.text));
@@ -150,8 +150,8 @@ async function main() {
     check('account page can connect Kick', /\/auth\/kick\/connect/.test(appJs.text) && /Connect Kick/.test(appJs.text) && !/Continue with Kick/.test(appJs.text));
     check('Account chip uses the Stake username and first letter', /paintNavAccount/.test(appJs.text) && /nav-account-mark/.test(appJs.text) && /stakeUser/.test(appJs.text));
     check('public home does not render the prize-place rewards grid', !/reward-grid/.test(appJs.text) && !/Place ' \+ String\(rank\)/.test(appJs.text) && !/rewardFiller/.test(appJs.text));
-    check('public home shows bonuses given so far after Community', /Bonuses given so far/.test(appJs.text) && /leaderboardPayout/.test(appJs.text) && /levelUpBonus/.test(appJs.text) && /socialMediaGiveaways/.test(appJs.text) && appJs.text.indexOf("id: 'community'") < appJs.text.indexOf('bonusesGivenSection()') && appJs.text.indexOf('bonusesGivenSection()') < appJs.text.indexOf('supportSection()'));
     const homeSrc = appJs.text.slice(appJs.text.indexOf('function homeView()'));
+    check('public home shows the bonus total under the Norochan intro', /Total given so far/.test(appJs.text) && /leaderboardPayout/.test(appJs.text) && /levelUpBonus/.test(appJs.text) && /socialMediaGiveaways/.test(appJs.text) && homeSrc.indexOf('hero-welcome-by') < homeSrc.indexOf('bonusesGivenSection()') && homeSrc.indexOf('bonusesGivenSection()') < homeSrc.indexOf("id: 'streams'"));
     check('public home shows monthly leaderboard before Kick top viewers', homeSrc.indexOf('leaderboardPreview()') !== -1 && homeSrc.indexOf("id: 'top-viewers'") !== -1 && homeSrc.indexOf('leaderboardPreview()') < homeSrc.indexOf("id: 'top-viewers'"));
     check('old admin bundle is gone', (await call('GET', '/admin.js')).status === 404 && (await call('GET', '/css/admin.css')).status === 404);
     const studioPage = record(await call('GET', '/studio.html'));
@@ -337,9 +337,94 @@ async function main() {
     check('studio has a Users list and code-check actions', /\/api\/admin\/users/.test(studioJs.text) && /Users/.test(studioJs.text) && /Kick username/.test(studioJs.text) && /Stake username/.test(studioJs.text) && /\/api\/admin\/accounts/.test(studioJs.text) && /Unbind/.test(studioJs.text) && /Code checks/.test(studioJs.text) && /reviewActions/.test(studioJs.text) && /Under code/.test(studioJs.text));
     check('studio Users list can search Stake username', /Search Stake username/.test(studioJs.text) && /userSearch/.test(studioJs.text) && /stakeUser/.test(studioJs.text));
     check('studio can update existing code-benefit posts', /Update code benefit/.test(studioJs.text) && /editingBenefitId/.test(studioJs.text));
-    check('studio splits each feature onto its own page', /studio-nav/.test(studioJs.text) && /id: 'users'/.test(studioJs.text) && /id: 'checks'/.test(studioJs.text) && /id: 'wheel'/.test(studioJs.text) && /id: 'prizes'/.test(studioJs.text) && /id: 'announcements'/.test(studioJs.text) && /id: 'benefits'/.test(studioJs.text) && /href: '\/studio\/' \+ page\.id/.test(studioJs.text) && !/'#\/' \+ page\.id/.test(studioJs.text) && !/hashchange/.test(studioJs.text) && !/location\.hash/.test(studioJs.text));
+    check('studio splits each feature onto its own page', /studio-nav/.test(studioJs.text) && /id: 'users'/.test(studioJs.text) && /id: 'checks'/.test(studioJs.text) && /id: 'wheel'/.test(studioJs.text) && /id: 'prizes'/.test(studioJs.text) && /id: 'benefits'/.test(studioJs.text) && !/id: 'announcements'/.test(studioJs.text) && /href: '\/studio\/' \+ page\.id/.test(studioJs.text) && !/'#\/' \+ page\.id/.test(studioJs.text) && !/hashchange/.test(studioJs.text) && !/location\.hash/.test(studioJs.text));
     check('studio copy says the draw video posts to Discord', /DISCORD_WHEEL_WEBHOOK/.test(studioJs.text) && /3-winner spin/.test(studioJs.text));
     check('studio Prizes page sets race and Kick viewer pools', /\/api\/admin\/prizes/.test(studioJs.text) && /Wager race prize pool/.test(studioJs.text) && /Kick viewer board prize pool/.test(studioJs.text) && /racePrizes/.test(studioJs.text) && /viewerRewards/.test(studioJs.text) && /Place amounts/.test(studioJs.text) && /Bonuses given so far/.test(studioJs.text) && /leaderboardPayout/.test(studioJs.text) && /levelUpBonus/.test(studioJs.text) && /socialMediaGiveaways/.test(studioJs.text));
+    check('studio can edit bonus hunts and winners', /\/api\/admin\/hunts/.test(studioJs.text) && /id: 'hunts'/.test(studioJs.text) && /Bonus hunts/.test(studioJs.text) && /Winner prize/.test(studioJs.text) && /\/entries\//.test(studioJs.text) && /Only on Stake/.test(studioJs.text) && /Total win/.test(studioJs.text) && /Multiplier/.test(studioJs.text) && /Stream day/.test(studioJs.text) && /Choose winner/.test(studioJs.text) && /Stop entries/.test(studioJs.text) && /Close hunt/.test(studioJs.text) && /Code verified: On/.test(studioJs.text) && !/Entry status/.test(studioJs.text));
+    check('public bonus hunt and winners pages are wired', /\/api\/bonus-hunts/.test(appJs.text) && /\/api\/bonus-hunts\/entry/.test(appJs.text) && /\/api\/bonus-hunts\/prediction/.test(appJs.text) && /\/api\/winners/.test(appJs.text) && /Current hunt/.test(appJs.text) && /Predictions/.test(appJs.text) && /Game queue/.test(appJs.text) && /Enter hunt/.test(appJs.text) && /50 spins/.test(appJs.text) && /Total given away/.test(appJs.text) && !/Profit starts at \$0/.test(appJs.text));
+    check('anonymous bonus-hunt writes are rejected', (await call('POST', '/api/admin/hunts', { body: { title: 'Nope' } })).status === 401 && (await call('POST', '/api/bonus-hunts/entry', { body: { slug: 'swamp-king' } })).status === 401 && (await call('POST', '/api/bonus-hunts/prediction', { body: { finalBalance: 800, bestMulti: 2 } })).status === 401);
+    const madeHunt = await call('POST', '/api/admin/hunts', staffOpts({
+      title: 'October bonus hunt',
+      startBalance: 50,
+      prize: 100,
+      winnerName: 'Alice_W',
+      status: 'current',
+      published: true,
+      streamDate: '2026-10-21',
+      slots: [{ name: 'Sweet Bonanza', bet: 20, payout: 80 }],
+    }));
+    check('staff can publish a bonus hunt at the fixed $800 start', madeHunt.status === 201 && madeHunt.json.item.title === 'October bonus hunt' && madeHunt.json.item.startBalance === 800 && madeHunt.json.item.accepting === true && Array.isArray(madeHunt.json.item.entries) && madeHunt.json.item.entries.length === 0);
+    const slotSearch = await call('GET', '/api/bonus-hunts/slots?q=' + encodeURIComponent('Swamp King'));
+    const swamp = (slotSearch.json.items || []).find((game) => game.name === 'Swamp King');
+    const dragonSearch = await call('GET', '/api/bonus-hunts/slots?q=' + encodeURIComponent('Dragonspire'));
+    const dragon = (dragonSearch.json.items || []).find((game) => game.name === 'Dragonspire');
+    check('Only on Stake search finds Swamp King and Dragonspire', !!(swamp && swamp.slug) && !!(dragon && dragon.slug) && (await call('GET', '/api/bonus-hunts/slots?q=')).json.items.length === 0);
+    const huntLogin = await call('POST', '/api/auth/login', { body: { email: 'player@example.com', password: 'longenough1' } });
+    const huntSid = String(huntLogin.headers.get('set-cookie') || '').split(';')[0];
+    check('an unverified Stake account cannot enter', (await call('POST', '/api/bonus-hunts/entry', { cookie: sid2, body: { slug: swamp.slug } })).status === 403);
+    check('unknown slot is rejected', (await call('POST', '/api/bonus-hunts/entry', { cookie: huntSid, body: { slug: 'not-a-real-slot' } })).status === 400);
+    const entered = await call('POST', '/api/bonus-hunts/entry', { cookie: huntSid, body: { slug: swamp.slug } });
+    check('connected user can enter one Only on Stake slot', entered.status === 201 && entered.json.entry && entered.json.entry.slotName === 'Swamp King');
+    const queuedNow = await call('GET', '/api/bonus-hunts', { cookie: huntSid });
+    check('entry is added to the hunt immediately', queuedNow.json.current.queue.length === 1 && queuedNow.json.current.queue[0].name === 'Swamp King' && queuedNow.json.current.queue[0].bet === 0.4 && queuedNow.json.current.queue[0].result == null && queuedNow.json.current.startBalance === 800 && queuedNow.json.current.profit === 0 && queuedNow.json.current.endBalance === 800 && queuedNow.json.current.spins === 50 && queuedNow.json.current.total === 1 && queuedNow.json.viewer.entry.slotName === 'Swamp King');
+    check('a player cannot enter twice', (await call('POST', '/api/bonus-hunts/entry', { cookie: huntSid, body: { slug: dragon.slug } })).status === 409);
+    const staffHunts = await call('GET', '/api/admin/hunts', { cookie });
+    const staffHunt = (staffHunts.json.items || []).find((hunt) => hunt.id === madeHunt.json.item.id);
+    check('staff see one entry with Stake and Kick names', staffHunt && staffHunt.entries.length === 1 && staffHunt.entries[0].stakeUser === 'Alice_W' && staffHunt.entries[0].kickName === 'alicekick' && staffHunt.entries[0].slotName === 'Swamp King');
+    const hiddenBoard = await call('GET', '/api/bonus-hunts');
+    check('public queue hides the player', !/Alice_W|alicekick|player@example\.com|accountId|stakeUser|kickName/.test(JSON.stringify({ queue: hiddenBoard.json.current.queue, viewer: hiddenBoard.json.viewer })));
+    const entryId = staffHunt.entries[0].id;
+    const called = await call('PATCH', '/api/admin/hunts/' + madeHunt.json.item.id + '/entries/' + entryId, staffOpts({ result: 116.16, multi: 290.4 }));
+    const afterCall = await call('GET', '/api/bonus-hunts');
+    check('staff total win and multiplier show on the queue', called.status === 200 && afterCall.json.current.queue[0].result === 116.16 && afterCall.json.current.queue[0].multi === 290.4 && afterCall.json.current.winnings === 116.16 && afterCall.json.current.profit === 116.16 && afterCall.json.current.endBalance === 916.16 && afterCall.json.current.bestSlot === 'Swamp King' && afterCall.json.current.biggestWin === 116.16 && afterCall.json.current.opened === 1, JSON.stringify(afterCall.json.current));
+    const implied = await call('PATCH', '/api/admin/hunts/' + madeHunt.json.item.id + '/entries/' + entryId, staffOpts({ result: 0.8, multi: '' }));
+    check('blank multiplier falls back to result divided by the bet', implied.status === 200 && (await call('GET', '/api/bonus-hunts')).json.current.queue[0].multi === 2 && (await call('GET', '/api/bonus-hunts')).json.current.queue[0].result === 0.8 && (await call('GET', '/api/bonus-hunts')).json.current.profit === 0.8);
+    const loss = await call('PATCH', '/api/admin/hunts/' + madeHunt.json.item.id + '/entries/' + entryId, staffOpts({ result: -20, multi: -50 }));
+    const afterLoss = await call('GET', '/api/bonus-hunts');
+    check('a posted total win can be a loss and profit can go negative', loss.status === 200 && afterLoss.json.current.queue[0].result === -20 && afterLoss.json.current.queue[0].multi === -50 && afterLoss.json.current.profit === -20 && afterLoss.json.current.endBalance === 780, JSON.stringify(afterLoss.json.current));
+    check('prediction title uses the Kick stream day', afterLoss.json.current.streamTitle === 'Kick stream on Wednesday, 21 October 2026');
+    check('an unverified account cannot predict', (await call('POST', '/api/bonus-hunts/prediction', { cookie: sid2, body: { finalBalance: 780, bestMulti: 2 } })).status === 403);
+    check('a prediction needs both numbers', (await call('POST', '/api/bonus-hunts/prediction', { cookie: huntSid, body: { finalBalance: 900 } })).status === 400);
+    const guessed = await call('POST', '/api/bonus-hunts/prediction', { cookie: huntSid, body: { finalBalance: 900, bestMulti: 100 } });
+    const guessedAgain = await call('POST', '/api/bonus-hunts/prediction', { cookie: huntSid, body: { finalBalance: 910, bestMulti: 80 } });
+    check('a connected player can save one prediction', guessed.status === 201 && guessed.json.prediction.finalBalance === 900 && guessedAgain.status === 409 && (await call('GET', '/api/bonus-hunts', { cookie: huntSid })).json.viewer.prediction.finalBalance === 900);
+    const predSignup = await call('POST', '/api/auth/signup', { body: { email: 'predict@example.com', password: 'longenough1' } });
+    const predMagic = await call('GET', predSignup.json.verifyPath);
+    const predSid = String(predMagic.headers.get('set-cookie') || '').split(';')[0];
+    check('second predictor can claim a Stake name', (await call('POST', '/api/verify/claim', { cookie: predSid, body: { stakeUser: 'PredictGuy', code: 'norochan' } })).status === 200);
+    const predAccounts = await call('GET', '/api/admin/accounts', { cookie });
+    const predAccountId = ((predAccounts.json.items || []).find((row) => row.email === 'predict@example.com') || {}).id;
+    check('staff can verify the predictor', (await call('POST', '/api/admin/accounts/' + predAccountId + '/code', staffOpts({ verdict: 'verified' }))).json.item.codeStatus === 'verified');
+    check('predictor can connect Kick', (await call('POST', '/api/auth/kick/test-link', { cookie: predSid, body: { kickId: 'kick-predict', kickName: 'predictkick' } })).json.account.kickName === 'predictkick');
+    const closer = await call('POST', '/api/bonus-hunts/prediction', { cookie: predSid, body: { finalBalance: 780, bestMulti: 2 } });
+    const predictedBoard = await call('GET', '/api/bonus-hunts');
+    check('closest final balance leads the prediction list', closer.status === 201 && predictedBoard.json.current.predictions.length === 2 && predictedBoard.json.current.predictions[0].name === 'PredictGuy' && predictedBoard.json.current.predictions[0].balanceGap === 0 && predictedBoard.json.current.predictions[1].name === 'Alice_W' && !/accountId|predictkick|alicekick/.test(JSON.stringify(predictedBoard.json.current.predictions)));
+    const stopped = await call('POST', '/api/admin/hunts/' + madeHunt.json.item.id + '/accepting', staffOpts({ accepting: false }));
+    const stoppedBoard = await call('GET', '/api/bonus-hunts');
+    const blockedEntry = await call('POST', '/api/bonus-hunts/entry', { cookie: predSid, body: { slug: dragon.slug } });
+    const blockedGuess = await call('POST', '/api/bonus-hunts/prediction', { cookie: huntSid, body: { finalBalance: 700, bestMulti: 1 } });
+    const callAfterStop = await call('PATCH', '/api/admin/hunts/' + madeHunt.json.item.id + '/entries/' + entryId, staffOpts({ result: -20, multi: -50 }));
+    check('staff can stop slot entries and predictions on the current hunt', stopped.status === 200 && stopped.json.item.accepting === false && stoppedBoard.json.current.accepting === false && blockedEntry.status === 400 && blockedGuess.status === 400 && callAfterStop.status === 200, JSON.stringify({ stopped: stopped.status, entry: blockedEntry.status, guess: blockedGuess.status, call: callAfterStop.status }));
+    const reopened = await call('POST', '/api/admin/hunts/' + madeHunt.json.item.id + '/accepting', staffOpts({ accepting: true }));
+    check('Kai can connect Kick', reopened.json.item.accepting === true && (await call('POST', '/api/auth/kick/test-link', { cookie: sid2, body: { kickId: 'kick-kai', kickName: 'kaikick' } })).json.account.kickName === 'kaikick');
+    const gatedEntry = await call('POST', '/api/bonus-hunts/entry', { cookie: sid2, body: { slug: dragon.slug } });
+    const gatedGuess = await call('POST', '/api/bonus-hunts/prediction', { cookie: sid2, body: { finalBalance: 100, bestMulti: 1 } });
+    const gateOff = await call('POST', '/api/admin/hunts/rules', staffOpts({ codeVerifiedOnly: false }));
+    const openEntry = await call('POST', '/api/bonus-hunts/entry', { cookie: sid2, body: { slug: dragon.slug } });
+    const openGuess = await call('POST', '/api/bonus-hunts/prediction', { cookie: sid2, body: { finalBalance: 100, bestMulti: 1 } });
+    const gateOn = await call('POST', '/api/admin/hunts/rules', staffOpts({ codeVerifiedOnly: true }));
+    const gatedAgain = await call('POST', '/api/bonus-hunts/prediction', { cookie: sid2, body: { finalBalance: 50, bestMulti: 1 } });
+    check('code verified only can be turned off and back on', (await call('POST', '/api/admin/hunts/rules', { body: { codeVerifiedOnly: false } })).status === 401 && gatedEntry.status === 403 && gatedGuess.status === 403 && gateOff.json.codeVerifiedOnly === false && openEntry.status === 201 && openGuess.status === 201 && gateOn.json.codeVerifiedOnly === true && gatedAgain.status === 403, JSON.stringify({ gatedEntry: gatedEntry.status, gatedGuess: gatedGuess.status, off: gateOff.status, openEntry: openEntry.status, openGuess: openGuess.status, on: gateOn.status, again: gatedAgain.status }));
+    const winners = await call('GET', '/api/winners');
+    check('winners page lists the hunt winner and prize', winners.status === 200 && winners.json.totalGiven === 100 && winners.json.items.length === 1 && winners.json.items[0].name === 'Alice_W' && winners.json.items[0].prize === 100 && winners.json.items[0].huntTitle === 'October bonus hunt');
+    check('draft hunts stay off the public board', (await call('POST', '/api/admin/hunts', staffOpts({ title: 'Hidden hunt', startBalance: 50, status: 'current', published: false, winnerName: 'Secret', prize: 5 }))).status === 201 && (await call('GET', '/api/bonus-hunts')).json.current.title === 'October bonus hunt' && (await call('GET', '/api/winners')).json.items.length === 1);
+    check('missing hunt title is rejected', (await call('POST', '/api/admin/hunts', staffOpts({ title: '   ' }))).status === 400);
+    check('invalid hunt prize is rejected', (await call('POST', '/api/admin/hunts', staffOpts({ title: 'Bad hunt', prize: -1 }))).status === 400);
+    const closedHunt = await call('POST', '/api/admin/hunts/' + madeHunt.json.item.id + '/close', staffOpts({}));
+    const previousBoard = await call('GET', '/api/bonus-hunts');
+    check('closing a hunt publishes its result on previous hunts', closedHunt.status === 200 && closedHunt.json.item.status === 'previous' && closedHunt.json.item.accepting === false && closedHunt.json.item.winnerName === 'PredictGuy' && previousBoard.json.current == null && previousBoard.json.previous.length === 1 && previousBoard.json.previous[0].status === 'previous' && previousBoard.json.previous[0].profit === -20 && previousBoard.json.previous[0].endBalance === 780 && previousBoard.json.previous[0].predictions[0].winner === true && previousBoard.json.page.hunts === 1 && previousBoard.json.page.profitRate === 0 && previousBoard.json.page.bestSlot === 'Swamp King' && (await call('POST', '/api/admin/hunts/' + madeHunt.json.item.id + '/close', staffOpts({}))).status === 400, JSON.stringify(previousBoard.json.page));
+    check('the closest prediction becomes the public winner', (await call('GET', '/api/winners')).json.items[0].name === 'PredictGuy' && (await call('GET', '/api/winners')).json.items[0].streamTitle === 'Kick stream on Wednesday, 21 October 2026' && (await call('GET', '/api/winners')).json.items[0].prize === 100);
+    check('entries wait for a live hunt', (await call('POST', '/api/bonus-hunts/entry', { cookie: huntSid, body: { slug: swamp.slug } })).status === 404);
     check('staff prize pools reject anonymous PATCH', (await call('PATCH', '/api/admin/prizes', { body: { racePrizePool: 900 } })).status === 401);
     const prizeSet = await call('PATCH', '/api/admin/prizes', staffOpts({ racePrizePool: 800, viewerPrizePool: 150 }));
     check('staff can set monthly race and Kick viewer prize pools', prizeSet.status === 200 && prizeSet.json.racePrizePool === 800 && prizeSet.json.viewerPrizePool === 150, JSON.stringify(prizeSet.json));

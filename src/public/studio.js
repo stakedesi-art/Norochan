@@ -2,7 +2,7 @@
 (function () {
   const app = document.getElementById('studio-app');
   const logoutBtn = document.getElementById('studio-logout');
-  const state = { categories: [], announcements: [], benefits: [], wheel: null, prizes: null, accounts: [], page: 'users', editingBenefitId: null, userSearch: '' };
+  const state = { categories: [], benefits: [], wheel: null, prizes: null, accounts: [], hunts: [], codeVerifiedOnly: true, page: 'users', editingBenefitId: null, editingHuntId: null, userSearch: '' };
   let renderDash = null;
   let csrf = '';
   let bootGen = 0;
@@ -130,34 +130,6 @@
       }, 'Delete')
     );
     return wrap;
-  }
-
-  function announcementForm(onDone) {
-    const status = note();
-    const title = h('input', { type: 'text', maxlength: '120', required: '' });
-    const body = h('textarea', { rows: '4', maxlength: '2000' });
-    const published = h('input', { type: 'checkbox' });
-    published.checked = true;
-    const form = h('form', { class: 'studio-form' },
-      h('h3', {}, 'New announcement'),
-      field('Title', title),
-      field('Body', body),
-      h('label', { class: 'studio-check' }, published, h('span', {}, 'Published')),
-      status,
-      h('button', { class: 'btn small', type: 'submit' }, 'Publish')
-    );
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      try {
-        await api('/api/admin/announcements', { method: 'POST', body: { title: title.value, body: body.value, published: published.checked } });
-        title.value = '';
-        body.value = '';
-        published.checked = true;
-        setNote(status, 'Saved.');
-        await onDone();
-      } catch (err) { setNote(status, err.message, true); }
-    });
-    return form;
   }
 
   function benefitForm(onDone) {
@@ -510,6 +482,203 @@
           tbody)));
   }
 
+  function huntsPanel(onRefresh) {
+    const rows = state.hunts || [];
+    const editing = rows.find((row) => row.id === state.editingHuntId) || null;
+    const status = note();
+    const title = h('input', { type: 'text', maxlength: '120', required: '', value: editing ? editing.title : '' });
+    const prize = h('input', { type: 'number', min: '0', max: '99999999', step: '0.01', placeholder: 'Optional', value: editing && editing.prize != null ? String(editing.prize) : '' });
+    const winner = h('input', { type: 'text', maxlength: '40', placeholder: 'Filled from the closest prediction', value: editing && editing.winnerName ? editing.winnerName : '' });
+    const streamDay = h('input', { type: 'date', value: editing && editing.streamDate ? editing.streamDate : '' });
+    const statusSel = h('select', {},
+      h('option', { value: 'current' }, 'Current hunt'),
+      h('option', { value: 'previous' }, 'Previous hunt'),
+      h('option', { value: 'draft' }, 'Draft'));
+    statusSel.value = editing ? (editing.status || 'draft') : 'current';
+    const published = h('input', { type: 'checkbox' });
+    published.checked = editing ? editing.published !== false : true;
+    const form = h('form', { class: 'studio-form' },
+      h('h3', {}, editing ? 'Update bonus hunt' : 'New bonus hunt'),
+      h('p', { class: 'muted' }, 'Start balance is $800 and every entry bets $0.40. Each Only on Stake slot is 50 spins. Set the Kick stream day so connected players can predict the final balance and biggest multiplier. Closing the hunt, or Choose winner, gives the win to the closest final balance. A matching multiplier breaks a tie.'),
+      field('Title', title),
+      field('Stream day', streamDay),
+      h('div', { class: 'studio-grid' },
+        field('Winner prize (USD)', prize),
+        field('Winner', winner)),
+      field('Status', statusSel),
+      h('label', { class: 'studio-check' }, published, h('span', {}, 'Published')),
+      status,
+      h('div', { class: 'studio-form-actions' },
+        h('button', { class: 'btn small', type: 'submit' }, editing ? 'Save hunt' : 'Publish hunt'),
+        editing ? h('button', {
+          class: 'btn small secondary', type: 'button',
+          onclick: () => { state.editingHuntId = null; if (renderDash) renderDash(); },
+        }, 'Cancel') : null)
+    );
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {
+        title: title.value,
+        prize: prize.value,
+        winnerName: winner.value,
+        streamDate: streamDay.value,
+        status: statusSel.value,
+        published: published.checked,
+      };
+      try {
+        if (editing) {
+          await api('/api/admin/hunts/' + encodeURIComponent(editing.id), { method: 'PATCH', body: payload });
+          state.editingHuntId = null;
+        } else {
+          await api('/api/admin/hunts', { method: 'POST', body: payload });
+        }
+        setNote(status, 'Saved.');
+        await onRefresh();
+      } catch (err) { setNote(status, err.message, true); }
+    });
+    const list = h('div', { class: 'studio-list' });
+    if (!rows.length) list.append(h('p', { class: 'muted' }, 'No bonus hunts yet.'));
+    else {
+      for (const row of rows) {
+        list.append(h('article', { class: 'studio-item' + (row.published ? '' : ' is-draft') + (editing && editing.id === row.id ? ' is-editing' : '') },
+          h('div', {},
+            h('p', { class: 'studio-item-meta' },
+              h('span', { class: 'studio-badge' + (row.status === 'current' && row.published ? ' is-ok' : row.published ? '' : ' is-warn') }, !row.published ? 'Draft' : row.status === 'previous' ? 'Completed' : row.status),
+              ' · ' + statsLine(row)),
+            h('h4', {}, row.title),
+            row.winnerName ? h('p', { class: 'muted' }, row.winnerName + (row.prize != null ? ' · $' + Number(row.prize).toLocaleString('en-US') : '')) : null,
+            row.streamDate ? h('p', { class: 'muted' }, 'Kick stream on ' + row.streamDate) : null,
+            row.status === 'current' && row.accepting === false ? h('p', { class: 'muted' }, 'Slot entries and predictions are closed. Calls can still be posted.') : null,
+            entryTable(row, onRefresh),
+            predictionTable(row, onRefresh)),
+          h('div', { class: 'studio-row-actions' },
+            row.status === 'current' ? h('button', {
+              class: 'btn small danger',
+              type: 'button',
+              onclick: async () => {
+                if (!window.confirm('Close this hunt? It moves to previous hunts and is marked completed.')) return;
+                try {
+                  await api('/api/admin/hunts/' + encodeURIComponent(row.id) + '/close', { method: 'POST', body: {} });
+                  await onRefresh();
+                } catch (err) { window.alert(err.message); }
+              },
+            }, 'Close hunt') : null,
+            row.status === 'current' ? h('button', {
+              class: 'btn small' + (row.accepting === false ? ' secondary' : ' danger'),
+              type: 'button',
+              onclick: async () => {
+                const stopping = row.accepting !== false;
+                if (stopping && !window.confirm('Stop slot entries and final-balance predictions for this hunt?')) return;
+                try {
+                  await api('/api/admin/hunts/' + encodeURIComponent(row.id) + '/accepting', {
+                    method: 'POST',
+                    body: { accepting: !stopping },
+                  });
+                  await onRefresh();
+                } catch (err) { window.alert(err.message); }
+              },
+            }, row.accepting === false ? 'Open entries' : 'Stop entries') : null,
+            h('button', { class: 'btn small secondary', type: 'button', onclick: () => { state.editingHuntId = row.id; goStudio('hunts'); } }, 'Edit'),
+            h('button', {
+              class: 'btn small danger', type: 'button',
+              onclick: async () => {
+                if (!window.confirm('Delete this bonus hunt?')) return;
+                try {
+                  if (state.editingHuntId === row.id) state.editingHuntId = null;
+                  await api('/api/admin/hunts/' + encodeURIComponent(row.id), { method: 'DELETE' });
+                  await onRefresh();
+                } catch (err) { window.alert(err.message); }
+              },
+            }, 'Delete'))));
+      }
+    }
+    return h('div', { class: 'studio-page' }, codeRule(onRefresh), form, h('section', { class: 'studio-card' }, h('h2', {}, 'Hunts'), list));
+  }
+
+  function codeRule(onRefresh) {
+    const on = state.codeVerifiedOnly !== false;
+    const toggle = h('button', {
+      class: 'btn small' + (on ? '' : ' secondary'),
+      type: 'button',
+    }, on ? 'Code verified: On' : 'Code verified: Off');
+    toggle.addEventListener('click', async () => {
+      try {
+        await api('/api/admin/hunts/rules', { method: 'POST', body: { codeVerifiedOnly: !on } });
+        await onRefresh();
+      } catch (err) { window.alert(err.message); }
+    });
+    return h('section', { class: 'studio-card' },
+      h('h2', {}, 'Who can enter'),
+      h('p', { class: 'muted' }, 'When this is on, only a verified Stake code can enter the bonus hunt and save a prediction. Stake and Kick still have to be connected. Turn it off to let any connected player enter.'),
+      toggle);
+  }
+
+  function predictionTable(hunt, onRefresh) {
+    const rows = hunt.predictions || [];
+    const pick = h('button', { class: 'btn small', type: 'button' }, 'Choose winner');
+    pick.addEventListener('click', async () => {
+      try {
+        await api('/api/admin/hunts/' + encodeURIComponent(hunt.id) + '/pick-winner', { method: 'POST', body: {} });
+        await onRefresh();
+      } catch (err) { window.alert(err.message); }
+    });
+    if (!rows.length) return h('p', { class: 'muted' }, 'No predictions yet.');
+    return h('div', { class: 'studio-entry-list' },
+      h('p', { class: 'studio-item-meta' }, 'Predictions'),
+      ...rows.map((row) => h('div', { class: 'studio-entry' },
+        h('div', {},
+          h('strong', {}, row.stakeUser || 'Player'),
+          h('p', { class: 'muted' }, row.kickName || 'Kick')),
+        h('p', {}, 'Balance ' + row.finalBalance),
+        h('p', {}, 'Multi ' + row.bestMulti),
+        row.id === hunt.winnerPredictionId ? h('span', { class: 'studio-badge is-ok' }, 'Winner') : null)),
+      pick);
+  }
+
+  function entryTable(hunt, onRefresh) {
+    const entries = hunt.entries || [];
+    if (!entries.length) return h('p', { class: 'muted' }, 'No entries yet.');
+    return h('div', { class: 'studio-entry-list' }, entries.map((entry) => entryEditor(hunt, entry, onRefresh)));
+  }
+
+  function entryEditor(hunt, entry, onRefresh) {
+    const result = h('input', { type: 'number', step: '0.01', placeholder: 'Total win', 'aria-label': 'Total win', value: entry.result == null ? '' : String(entry.result) });
+    const multi = h('input', { type: 'number', step: '0.01', placeholder: 'Multiplier', 'aria-label': 'Multiplier', value: entry.multi == null ? '' : String(entry.multi) });
+    const rowNote = note();
+    const save = h('button', { class: 'btn small', type: 'button' }, 'Save call');
+    save.addEventListener('click', async () => {
+      try {
+        await api('/api/admin/hunts/' + encodeURIComponent(hunt.id) + '/entries/' + encodeURIComponent(entry.id), {
+          method: 'PATCH',
+          body: { result: result.value, multi: multi.value },
+        });
+        await onRefresh();
+      } catch (err) { setNote(rowNote, err.message, true); }
+    });
+    const remove = h('button', { class: 'btn small danger', type: 'button' }, 'Remove');
+    remove.addEventListener('click', async () => {
+      if (!window.confirm('Remove this entry?')) return;
+      try {
+        await api('/api/admin/hunts/' + encodeURIComponent(hunt.id) + '/entries/' + encodeURIComponent(entry.id), { method: 'DELETE' });
+        await onRefresh();
+      } catch (err) { setNote(rowNote, err.message, true); }
+    });
+    return h('div', { class: 'studio-entry' },
+      h('div', {},
+        h('strong', {}, entry.slotName || 'Slot'),
+        h('p', { class: 'muted' }, (entry.stakeUser || 'Stake') + ' · ' + (entry.kickName || 'Kick'))),
+      result,
+      multi,
+      h('div', { class: 'studio-row-actions' }, save, remove),
+      rowNote);
+  }
+
+  function statsLine(row) {
+    const entries = row.entries || [];
+    const called = entries.filter((entry) => entry.result != null).length;
+    return '$800 start · $0.40 bet · ' + entries.length + ' entries · ' + called + ' called';
+  }
+
   function laterPanel() {
     return h('section', { class: 'studio-card studio-later' },
       h('p', { class: 'studio-empty' }, 'On-site chat is not built. Community stays on Discord and Telegram.'));
@@ -519,8 +688,8 @@
     { id: 'users', label: 'Users', title: 'Users', hint: 'Registered emails with Stake username, code status, and Kick username.' },
     { id: 'checks', label: 'Code checks', title: 'Code checks', hint: 'Owner-code submits wait here. Use Under code or Not under code. Unbind only clears the name.' },
     { id: 'wheel', label: 'Wheel', title: 'Monthly wheel', hint: 'Staff set the prize-pool total only. Three winners are drawn automatically at UTC month end.' },
+    { id: 'hunts', label: 'Bonus hunts', title: 'Bonus hunts', hint: 'Code verified only limits entries and predictions to verified Stake codes. Connected players predict the final balance and biggest multiplier.' },
     { id: 'prizes', label: 'Prizes', title: 'Prize pools', hint: 'Set this month’s race and Kick viewer pools and place amounts, plus the public Bonuses given so far totals.' },
-    { id: 'announcements', label: 'Announcements', title: 'Announcements', hint: 'Published posts appear on the public home page. Drafts stay hidden.' },
     { id: 'benefits', label: 'Code benefits', title: 'Code benefits', hint: 'Reward-category posts. Empty categories stay off the public Rewards section.' },
     { id: 'chat', label: 'Chat', title: 'Chat', hint: 'Community stays on Discord and Telegram.' },
   ];
@@ -567,12 +736,8 @@
     if (id === 'users') return usersPanel(refresh);
     if (id === 'checks') return accountsPanel(refresh);
     if (id === 'wheel') return wheelPanel(refresh);
+    if (id === 'hunts') return huntsPanel(refresh);
     if (id === 'prizes') return prizesPanel(refresh);
-    if (id === 'announcements') {
-      return h('div', { class: 'studio-page' },
-        announcementForm(refresh),
-        listCard('Published and drafts', state.announcements, 'announcement', 'No announcements yet.', refresh));
-    }
     if (id === 'benefits') {
       return h('div', { class: 'studio-page' },
         benefitForm(refresh),
@@ -594,19 +759,20 @@
   }
 
   async function loadLists() {
-    const [ann, ben, wheel, prizes, acc] = await Promise.all([
-      api('/api/admin/announcements'),
+    const [ben, wheel, prizes, acc, huntList] = await Promise.all([
       api('/api/admin/benefits'),
       api('/api/admin/wheel'),
       api('/api/admin/prizes'),
       api('/api/admin/users'),
+      api('/api/admin/hunts'),
     ]);
-    state.announcements = ann.items || [];
     state.benefits = ben.items || [];
     if (ben.categories && ben.categories.length) state.categories = ben.categories;
     state.wheel = wheel;
     state.prizes = prizes;
     state.accounts = acc.items || [];
+    state.hunts = huntList.items || [];
+    state.codeVerifiedOnly = huntList.codeVerifiedOnly !== false;
   }
 
   async function dashboard() {

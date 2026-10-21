@@ -626,23 +626,11 @@
   }
 
   function feedMounts() {
-    const news = h('div', {});
     const benefits = h('div', {});
     async function load() {
       let feed;
       try { feed = await api('/api/feed'); }
       catch { return; }
-      if (feed.announcements && feed.announcements.length) {
-        news.replaceChildren(h('section', { class: 'section-block', 'aria-labelledby': 'news-heading' },
-          h('div', { class: 'section-head' },
-            h('div', {},
-              h('span', { class: 'eyebrow' }, 'News'),
-              h('h2', { id: 'news-heading' }, 'Announcements'))),
-          h('div', { class: 'feed-list' },
-            feed.announcements.map((row) => h('article', { class: 'feed-card' },
-              h('h3', {}, row.title),
-              row.body ? h('p', {}, row.body) : null)))));
-      }
       if (feed.categories && feed.categories.length) {
         benefits.replaceChildren(h('div', { class: 'benefit-market', 'aria-labelledby': 'benefits-heading' },
           h('div', { class: 'section-head' },
@@ -665,7 +653,7 @@
       if (typeof initReveal === 'function') initReveal();
     }
     load();
-    return { news, benefits };
+    return { benefits };
   }
 
   function wheelStrip() {
@@ -1366,7 +1354,8 @@
             h('span', { class: 'hero-welcome-x', 'aria-hidden': 'true' }, '×'),
             h('span', { class: 'hero-welcome-stake' }, 'Stake')),
           h('h1', {}, 'Norochan'),
-          h('p', { class: 'hero-welcome-by' }, 'By Norochan'))),
+          h('p', { class: 'hero-welcome-by' }, 'By Norochan'),
+          bonusesGivenSection())),
       codeRace,
       h('section', { id: 'streams', class: 'section-block streams-section', 'data-spy': 'streams' },
         h('div', { class: 'section-head' },
@@ -1379,7 +1368,6 @@
       h('section', { id: 'top-viewers', class: 'section-block', 'data-spy': 'streams' }, kickTopViewersSection()),
       wheelStrip(),
       h('section', { id: 'benefits', class: 'section-block', 'data-spy': 'benefits' }, feed.benefits),
-      h('section', { id: 'announcements', class: 'section-block', 'data-spy': 'announcements' }, feed.news),
       h('section', { id: 'community', class: 'section-block', 'data-spy': 'community' },
         h('div', { class: 'section-head' },
           h('div', {},
@@ -1387,7 +1375,6 @@
             h('h2', {}, 'Official channels'),
             h('p', { class: 'muted' }, 'The places Norochan actually posts.'))),
         h('div', { class: 'community-grid' }, links)),
-      bonusesGivenSection(),
       supportSection());
   }
 
@@ -1399,14 +1386,10 @@
     ];
     const values = items.map((item) => rewardFigure(item.key));
     const total = values.every((v) => v == null) ? null : values.reduce((sum, v) => sum + (Number(v) || 0), 0);
-    return h('section', { id: 'bonuses', class: 'section-block' },
-      h('div', { class: 'section-head' },
-        h('div', {},
-          h('span', { class: 'eyebrow' }, 'Payouts'),
-          h('h2', {}, 'Bonuses given so far'),
-          h('p', { class: 'muted' }, total != null
-            ? usd0(total) + ' USD paid across these bonuses.'
-            : 'Running totals for bonuses already paid.'))),
+    return h('section', { id: 'bonuses', class: 'section-block bonus-highlight' },
+      h('div', { class: 'bonus-total' },
+        h('p', { class: 'bonus-total-label' }, 'Total given so far'),
+        h('strong', { class: 'bonus-total-amount' }, total != null ? usd0(total) : '—')),
       h('div', { class: 'payout-grid' },
         items.map((item, i) => h('article', { class: 'payout-card' },
           h('span', { class: 'payout-label' }, item.label),
@@ -1727,14 +1710,380 @@
     return wrap;
   }
 
-  const pageNames = { home: 'Home', leaderboard: 'Leaderboard', support: 'Support', wheel: 'Wheel', benefits: 'Code benefits', announcements: 'Announcement', streams: 'Streams', community: 'Community', account: 'Account' };
-  const homeSections = { wheel: 'wheel', benefits: 'benefits', announcements: 'announcements', streams: 'streams', community: 'community', support: 'support' };
+  const multiText = (n) => (n == null || !Number.isFinite(Number(n)) ? '—' : Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x');
+  const signedUsd = (n) => {
+    const value = Number(n) || 0;
+    return (value < 0 ? '-' : value > 0 ? '+' : '') + usd(Math.abs(value));
+  };
+  const cashText = (n) => {
+    const value = Number(n);
+    if (!Number.isFinite(value)) return '—';
+    return (value < 0 ? '-' : '') + usd(Math.abs(value));
+  };
+  const dash = (value) => (value == null || value === '' ? '—' : value);
+
+  function huntStat(label, value, tone) {
+    return h('div', { class: 'hunt-stat' + (tone ? ' is-' + tone : '') },
+      h('span', {}, label),
+      h('strong', {}, value));
+  }
+
+  function huntQueue(hunt, query) {
+    const q = String(query || '').trim().toLowerCase();
+    const rows = (hunt.queue || []).filter((slot) => !q || String(slot.name || '').toLowerCase().includes(q));
+    if (!rows.length) return h('p', { class: 'hunt-empty' }, q ? 'No slot matches that search.' : 'No slots in this hunt yet.');
+    return h('div', { class: 'hunt-table-wrap' },
+      h('table', { class: 'hunt-table' },
+        h('thead', {}, h('tr', {},
+          h('th', {}, '#'),
+          h('th', {}, 'Slot'),
+          h('th', {}, 'Bet'),
+          h('th', {}, 'Result'),
+          h('th', {}, 'Multi'))),
+        h('tbody', {}, rows.map((slot) => h('tr', { class: slot.best ? 'is-best' : '' },
+          h('td', { 'data-label': '#' }, '#' + slot.position),
+          h('td', { 'data-label': 'Slot' },
+            h('strong', {}, slot.name),
+            slot.pending ? h('span', { class: 'hunt-pending' }, 'Pending') : null),
+          h('td', { 'data-label': 'Bet' }, usd(slot.bet)),
+          h('td', { 'data-label': 'Result' }, slot.result == null ? '—' : cashText(slot.result)),
+          h('td', { 'data-label': 'Multi' }, slot.best ? h('span', { class: 'hunt-pill is-best' }, multiText(slot.multi)) : dash(slot.multi == null ? null : multiText(slot.multi))))))));
+  }
+
+  function huntDetail(hunt, query, searchNode) {
+    return h('article', { class: 'hunt-card' },
+      h('div', { class: 'hunt-card-head' },
+        h('h2', {}, hunt.title),
+        h('div', { class: 'hunt-pills' },
+          hunt.status === 'current' ? h('span', { class: 'hunt-pill is-live' }, 'Live') : h('span', { class: 'hunt-pill' }, 'Completed'),
+          hunt.status === 'current' && hunt.accepting === false ? h('span', { class: 'hunt-pill' }, 'Entries closed') : null,
+          h('span', { class: 'hunt-pill' }, hunt.opened + '/' + hunt.total + ' called'))),
+      h('div', { class: 'hunt-stats' },
+        huntStat('Start → result', usd(hunt.startBalance) + ' → ' + cashText(hunt.endBalance)),
+        huntStat('Profit', signedUsd(hunt.profit), hunt.profit < 0 ? 'down' : hunt.profit > 0 ? 'up' : ''),
+        huntStat('Best multi', hunt.bestSlot ? multiText(hunt.bestMulti) + ' · ' + hunt.bestSlot : multiText(hunt.bestMulti), 'win'),
+        huntStat('Biggest win', hunt.biggestWin == null ? '—' : cashText(hunt.biggestWin), 'win'),
+        huntStat('Slots', String(hunt.total)),
+        huntStat('Bet', usd(hunt.bet))),
+      hunt.winnerName
+        ? h('p', { class: 'hunt-winner-line' }, 'Winner ', h('a', { href: '/winners' }, hunt.winnerName), hunt.prize != null ? ' · prize ' + usd(hunt.prize) : '')
+        : null,
+      h('div', { class: 'hunt-queue-head' },
+        h('h3', {}, 'Game queue'),
+        searchNode || null),
+      huntQueue(hunt, query));
+  }
+
+  function huntPastCard(hunt, selected, onPick) {
+    return h('button', {
+      type: 'button',
+      class: 'hunt-past-card' + (selected && selected.id === hunt.id ? ' is-active' : ''),
+      onclick: () => onPick(hunt),
+    },
+    h('div', { class: 'hunt-past-top' },
+      h('strong', {}, hunt.title),
+      h('span', { class: 'hunt-profit' + (hunt.profit < 0 ? ' is-down' : hunt.profit > 0 ? ' is-up' : '') }, signedUsd(hunt.profit))),
+    h('div', { class: 'hunt-past-grid' },
+      h('div', {}, h('span', {}, 'Start → result'), h('strong', {}, usd(hunt.startBalance) + ' → ' + cashText(hunt.endBalance))),
+      h('div', {}, h('span', {}, 'Best multi'), h('strong', {}, hunt.bestSlot ? multiText(hunt.bestMulti) + ' · ' + hunt.bestSlot : multiText(hunt.bestMulti))),
+      h('div', {}, h('span', {}, 'Biggest win'), h('strong', {}, hunt.biggestWin == null ? '—' : cashText(hunt.biggestWin))),
+      h('div', {}, h('span', {}, 'Slots'), h('strong', {}, String(hunt.total)))));
+  }
+
+  async function huntsView() {
+    const shell = h('div', { class: 'hunts-page' },
+      h('header', { class: 'page-intro' },
+        h('h1', {}, 'Bonus hunts'),
+        h('p', { class: 'muted' }, 'One Only on Stake slot per connected player. Every slot is 50 spins in the bonus chase. The bet is $0.40 and the hunt starts at $800.')));
+    app.replaceChildren(shell);
+    let data;
+    try { data = await api('/api/bonus-hunts'); }
+    catch (err) {
+      shell.append(h('p', { class: 'note warn', role: 'alert' }, err.message));
+      return;
+    }
+    let tab = data.current ? 'current' : 'previous';
+    let selected = tab === 'current' ? data.current : (data.previous[0] || null);
+    let query = '';
+    const search = h('input', {
+      type: 'search',
+      class: 'hunt-search',
+      placeholder: 'Search slots…',
+      'aria-label': 'Search slots',
+    });
+    const entryBox = h('section', { class: 'hunt-entry' });
+    const predictBox = h('section', { class: 'hunt-predict' });
+    const body = h('div', { class: 'hunt-body' });
+    function predictionTarget() {
+      return data.current || (data.previous && data.previous[0]) || null;
+    }
+    function paintPredict() {
+      const hunt = predictionTarget();
+      predictBox.replaceChildren();
+      if (!hunt) return;
+      const viewer = data.viewer || { eligible: false, reason: 'Sign in to predict.', prediction: null };
+      const kids = [
+        h('div', { class: 'hunt-predict-head' },
+          h('span', { class: 'eyebrow' }, 'Kick stream'),
+          h('h3', {}, hunt.streamTitle || 'Kick stream prediction')),
+        h('p', { class: 'muted' }, 'Predict the final balance and the biggest multiplier once. The closest final balance wins. If two guesses tie, the closest biggest multiplier wins.'),
+        h('div', { class: 'hunt-predict-now' },
+          huntStat('Final balance', cashText(hunt.endBalance)),
+          huntStat('Best multi', multiText(hunt.bestMulti), 'win')),
+      ];
+      if (!hunt.streamDate) {
+        kids.push(h('p', {}, 'The stream day is not set yet.'));
+      } else if (hunt.status !== 'current') {
+        kids.push(h('p', {}, hunt.winnerName ? 'Winner: ' + hunt.winnerName : 'This prediction is closed.'));
+      } else if (hunt.accepting === false) {
+        kids.push(h('p', {}, 'Predictions are closed.'));
+      } else if (!viewer.eligible) {
+        kids.push(h('p', {}, viewer.reason || 'Sign in to predict.'));
+        kids.push(h('a', { class: 'btn small', href: '/account' }, 'Account'));
+      } else if (viewer.prediction) {
+        kids.push(h('p', { class: 'hunt-guess' },
+          'Your guess is ',
+          h('strong', {}, cashText(viewer.prediction.finalBalance) + ' · ' + multiText(viewer.prediction.bestMulti)),
+          '. It cannot be changed.'));
+      } else {
+        const balance = h('input', { type: 'number', step: '0.01', inputmode: 'decimal', placeholder: '800.00', 'aria-label': 'Final balance' });
+        const multi = h('input', { type: 'number', step: '0.01', inputmode: 'decimal', placeholder: '0.00', 'aria-label': 'Biggest multiplier' });
+        const status = h('p', { class: 'note', role: 'status' });
+        const submit = h('button', { class: 'btn small', type: 'button' }, 'Save prediction');
+        submit.addEventListener('click', async () => {
+          status.classList.remove('warn');
+          try {
+            await api('/api/bonus-hunts/prediction', {
+              method: 'POST',
+              body: { finalBalance: balance.value, bestMulti: multi.value },
+            });
+            data = await api('/api/bonus-hunts');
+            paintPredict();
+            paint();
+          } catch (err) {
+            status.textContent = err.message;
+            status.classList.add('warn');
+          }
+        });
+        kids.push(
+          h('div', { class: 'hunt-predict-fields' },
+            h('label', { class: 'hunt-field' }, h('span', {}, 'Final balance'), balance),
+            h('label', { class: 'hunt-field' }, h('span', {}, 'Biggest multiplier'), multi)),
+          submit,
+          status);
+      }
+      const rows = hunt.predictions || [];
+      kids.push(rows.length
+        ? h('div', { class: 'hunt-table-wrap' },
+          h('table', { class: 'hunt-table' },
+            h('thead', {}, h('tr', {},
+              h('th', {}, '#'),
+              h('th', {}, 'Player'),
+              h('th', {}, 'Final balance'),
+              h('th', {}, 'Best multi'),
+              h('th', {}, 'Gap'))),
+            h('tbody', {}, rows.map((row) => h('tr', { class: row.winner ? 'is-best' : '' },
+              h('td', { 'data-label': '#' }, '#' + row.place),
+              h('td', { 'data-label': 'Player' }, row.name + (row.winner ? ' · Winner' : '')),
+              h('td', { 'data-label': 'Final balance' }, cashText(row.finalBalance)),
+              h('td', { 'data-label': 'Best multi' }, multiText(row.bestMulti)),
+              h('td', { 'data-label': 'Gap' }, cashText(row.balanceGap)))))))
+        : h('p', { class: 'hunt-predict-empty' }, 'No predictions yet.'));
+      predictBox.replaceChildren(...kids.filter(Boolean));
+    }
+    function paintEntry() {
+      entryBox.replaceChildren();
+      if (!data.current) return;
+      const viewer = data.viewer || { eligible: false, reason: 'Sign in to enter this hunt.', entry: null };
+      const kids = [
+        h('h3', {}, 'Your entry'),
+        h('p', { class: 'muted' }, 'Pick one Only on Stake slot. It is added right away and played for 50 spins. Staff post the total win from those spins, which can be a loss.'),
+      ];
+      if (viewer.entry) {
+        kids.push(h('p', {}, 'You are in with ' + viewer.entry.slotName + '.'));
+      } else if (data.current.accepting === false) {
+        kids.push(h('p', {}, 'Slot entries are closed.'));
+      } else if (!viewer.eligible) {
+        kids.push(h('p', {}, viewer.reason || 'Sign in to enter this hunt.'));
+        kids.push(h('a', { class: 'btn small', href: '/account' }, 'Account'));
+      }
+      if (viewer.eligible && !viewer.entry && data.current.accepting !== false) {
+        let picked = null;
+        const input = h('input', {
+          type: 'search',
+          class: 'hunt-search',
+          placeholder: 'Search Only on Stake slots',
+          'aria-label': 'Search Only on Stake slots',
+          autocomplete: 'off',
+        });
+        const list = h('div', { class: 'hunt-suggest-list', hidden: true });
+        let suggestGen = 0;
+        input.addEventListener('input', async () => {
+          picked = null;
+          const q = input.value.trim();
+          const gen = ++suggestGen;
+          if (q.length < 1) {
+            list.hidden = true;
+            list.replaceChildren();
+            return;
+          }
+          try {
+            const out = await api('/api/bonus-hunts/slots?q=' + encodeURIComponent(q));
+            if (gen !== suggestGen) return;
+            const items = out.items || [];
+            list.hidden = !items.length;
+            list.replaceChildren(...items.map((game) => h('button', {
+              type: 'button',
+              onclick: () => {
+                picked = game;
+                input.value = game.name;
+                list.hidden = true;
+              },
+            }, game.name)));
+          } catch { /* keep the last list */ }
+        });
+        const submit = h('button', { class: 'btn small', type: 'button' }, 'Enter hunt');
+        const status = h('p', { class: 'note', role: 'status' });
+        submit.addEventListener('click', async () => {
+          status.classList.remove('warn');
+          if (!picked) {
+            status.textContent = 'Pick a slot from the list.';
+            status.classList.add('warn');
+            return;
+          }
+          try {
+            await api('/api/bonus-hunts/entry', { method: 'POST', body: { slug: picked.slug } });
+            data = await api('/api/bonus-hunts');
+            selected = data.current;
+            paintEntry();
+            paint();
+          } catch (err) {
+            status.textContent = err.message;
+            status.classList.add('warn');
+          }
+        });
+        kids.push(h('div', { class: 'hunt-entry-actions' }, h('div', { class: 'hunt-suggest' }, input, list), submit), status);
+      }
+      entryBox.replaceChildren(...kids.filter(Boolean));
+    }
+    function paint() {
+      const tabs = h('div', { class: 'hunt-tabs', role: 'tablist' },
+        [['current', 'Current hunt'], ['predictions', 'Predictions'], ['previous', 'Previous hunts']].map(([id, label]) => h('button', {
+          type: 'button',
+          class: 'hunt-tab' + (tab === id ? ' is-active' : ''),
+          role: 'tab',
+          'aria-selected': tab === id ? 'true' : 'false',
+          onclick: () => {
+            tab = id;
+            selected = id === 'current' ? data.current : (data.previous[0] || null);
+            query = '';
+            search.value = '';
+            paint();
+          },
+        }, label)));
+      body.replaceChildren(tabs);
+      if (tab === 'predictions') {
+        const hunt = predictionTarget();
+        if (!hunt) {
+          body.append(h('p', { class: 'hunt-empty' }, 'No bonus hunt to predict yet.'));
+          return;
+        }
+        body.append(predictBox);
+        return;
+      }
+      if (tab === 'current') {
+        if (!data.current) {
+          body.append(h('p', { class: 'hunt-empty' }, 'No bonus hunt is live right now.'));
+          return;
+        }
+        body.append(entryBox, huntDetail(data.current, query, huntSearch()));
+        return;
+      }
+      const page = data.page || { hunts: (data.previous || []).length, profitRate: null, bestMulti: null, bestSlot: null };
+      body.append(h('div', { class: 'hunt-stats hunt-page-stats' },
+        huntStat('Hunts this page', String(page.hunts || 0)),
+        huntStat('Profit rate', page.profitRate == null ? '—' : page.profitRate + '%'),
+        huntStat('Best multi', page.bestSlot ? multiText(page.bestMulti) + ' · ' + page.bestSlot : multiText(page.bestMulti), 'win')));
+      if (!data.previous.length) {
+        body.append(h('p', { class: 'hunt-empty' }, 'No previous hunts yet.'));
+        return;
+      }
+      body.append(h('div', { class: 'hunt-past' }, data.previous.map((hunt) => huntPastCard(hunt, selected, (huntRow) => {
+        selected = huntRow;
+        paint();
+      }))));
+      if (selected) body.append(huntDetail(selected, query, huntSearch()));
+    }
+    search.addEventListener('input', () => {
+      const caret = search.selectionStart;
+      query = search.value;
+      paint();
+      search.focus();
+      try { search.setSelectionRange(caret, caret); } catch { /* search type may hide the caret */ }
+    });
+    function huntSearch() {
+      return h('label', { class: 'hunt-search-wrap' }, search);
+    }
+    shell.append(body);
+    paintEntry();
+    paintPredict();
+    paint();
+  }
+
+  async function winnersView() {
+    const shell = h('div', { class: 'winners-page' },
+      h('header', { class: 'page-intro' },
+        h('h1', {}, 'Winners'),
+        h('p', { class: 'muted' }, 'The winner guessed closest to the bonus hunt final balance.')));
+    app.replaceChildren(shell);
+    let data;
+    try { data = await api('/api/winners'); }
+    catch (err) {
+      shell.append(h('p', { class: 'note warn', role: 'alert' }, err.message));
+      return;
+    }
+    const search = h('input', {
+      type: 'search',
+      class: 'hunt-search',
+      placeholder: 'Search by username',
+      'aria-label': 'Search winners',
+    });
+    const list = h('div', { class: 'winner-list' });
+    const count = h('p', { class: 'winner-count' });
+    function paint() {
+      const q = String(search.value || '').trim().toLowerCase();
+      const items = (data.items || []).filter((item) => !q || String(item.name || '').toLowerCase().includes(q) || String(item.huntTitle || '').toLowerCase().includes(q));
+      count.textContent = items.length + ' of ' + (data.items || []).length;
+      if (!items.length) {
+        list.replaceChildren(h('p', { class: 'hunt-empty' }, q ? 'No winner matches that search.' : 'No bonus-hunt winners yet.'));
+        return;
+      }
+      list.replaceChildren(...items.map((item) => h('article', { class: 'winner-card' },
+        h('div', { class: 'winner-card-copy' },
+          h('h2', {}, item.name),
+          h('p', {}, item.streamTitle || item.huntTitle || 'Bonus hunt')),
+        h('strong', { class: 'winner-prize' }, usd(item.prize)))));
+    }
+    search.addEventListener('input', paint);
+    shell.append(
+      h('section', { class: 'winner-total' },
+        h('span', {}, 'Total given away'),
+        h('strong', {}, usd(data.totalGiven || 0))),
+      h('label', { class: 'hunt-search-wrap' }, search),
+      count,
+      list);
+    paint();
+  }
+
+  const pageNames = { home: 'Home', leaderboard: 'Leaderboard', support: 'Support', wheel: 'Wheel', hunts: 'Bonus hunts', winners: 'Winners', benefits: 'Code benefits', streams: 'Streams', community: 'Community', account: 'Account' };
+  const homeSections = { wheel: 'wheel', benefits: 'benefits', streams: 'streams', community: 'community', support: 'support' };
   const ROUTE_PATH = {
     home: '/',
     leaderboard: '/leaderboard',
     wheel: '/wheel',
+    hunts: '/bonus-hunts',
+    winners: '/winners',
     benefits: '/code-benefits',
-    announcements: '/announcement',
     community: '/community',
     support: '/support',
     account: '/account',
@@ -1745,10 +2094,10 @@
     '/': 'home',
     leaderboard: 'leaderboard',
     wheel: 'wheel',
+    'bonus-hunts': 'hunts',
+    winners: 'winners',
     'code-benefits': 'benefits',
     benefits: 'benefits',
-    announcement: 'announcements',
-    announcements: 'announcements',
     community: 'community',
     support: 'support',
     account: 'account',
@@ -1963,11 +2312,13 @@
     if (name !== 'streams' && canonical && normalizePathname(location.pathname) !== canonical) {
       history.replaceState(null, '', canonical + location.search);
     }
-    setActiveNav(section || (['leaderboard', 'account'].includes(name) ? name : 'home'));
+    setActiveNav(section || (['leaderboard', 'account', 'hunts', 'winners'].includes(name) ? name : 'home'));
     const announcer = document.getElementById('route-announcer');
     if (announcer) announcer.textContent = pageNames[name] || pageNames.home;
     if (name === 'leaderboard') { currentView = 'leaderboard'; await leaderboardView(); }
     else if (name === 'account') { currentView = 'account'; app.replaceChildren(accountView()); }
+    else if (name === 'hunts') { currentView = 'hunts'; await huntsView(); }
+    else if (name === 'winners') { currentView = 'winners'; await winnersView(); }
     else { currentView = 'home'; app.replaceChildren(homeView()); }
     if (gen !== routeGen) return;
     document.body.classList.toggle('is-home', currentView === 'home');

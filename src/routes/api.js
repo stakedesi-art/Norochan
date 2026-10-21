@@ -2,12 +2,13 @@
 // /api/* public, read-only JSON routes.
 const storage = require('../storage');
 const { CONFIG, KICK_CHANNEL } = require('../config');
-const { HttpError, sendJson } = require('../lib/http');
+const { HttpError, sendJson, readJson, checkOrigin } = require('../lib/http');
 const { state, mask, prizeFor } = require('../services/stake');
 const { fetchKickChannelStatus } = require('../services/kick');
 const { botrix, VIEWER_TRACKING_UNSUPPORTED, viewerRewardFor } = require('../services/viewers');
 const { publicRewards, publicRacePrizes, publicViewerRewards } = require('../services/rewards');
 const { publicFeed } = require('../services/content');
+const hunts = require('../services/hunts');
 const { publicWheel } = require('../services/wheel');
 const { handleAdmin } = require('./admin');
 const { handleAccount, authPublic } = require('./account');
@@ -53,6 +54,47 @@ async function handleApi(req, res, url) {
 
   if (route === 'GET /api/feed') {
     return sendJson(res, 200, publicFeed());
+  }
+
+  if (route === 'GET /api/bonus-hunts') {
+    return sendJson(res, 200, hunts.publicBoard(accounts.accountFromReq(req)));
+  }
+
+  if (route === 'GET /api/bonus-hunts/slots') {
+    return sendJson(res, 200, { items: hunts.searchSlots(url.searchParams.get('q')) });
+  }
+
+  if (route === 'POST /api/bonus-hunts/entry') {
+    checkOrigin(req);
+    try {
+      const account = accounts.requireAccount(req);
+      const result = hunts.submitEntry(account, await readJson(req));
+      return sendJson(res, result.created ? 201 : 200, { entry: hunts.ownEntry(result.entry) });
+    } catch (err) {
+      if (err.status) return sendJson(res, err.status, { error: err.message });
+      throw err;
+    }
+  }
+
+  if (route === 'POST /api/bonus-hunts/prediction') {
+    checkOrigin(req);
+    try {
+      const account = accounts.requireAccount(req);
+      const result = hunts.submitPrediction(account, await readJson(req));
+      return sendJson(res, result.created ? 201 : 200, {
+        prediction: {
+          finalBalance: result.prediction.finalBalance,
+          bestMulti: result.prediction.bestMulti,
+        },
+      });
+    } catch (err) {
+      if (err.status) return sendJson(res, err.status, { error: err.message });
+      throw err;
+    }
+  }
+
+  if (route === 'GET /api/winners') {
+    return sendJson(res, 200, hunts.publicWinners());
   }
 
   if (route === 'GET /api/wheel') {

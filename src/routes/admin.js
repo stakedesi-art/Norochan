@@ -6,6 +6,7 @@ const content = require('../services/content');
 const wheel = require('../services/wheel');
 const accounts = require('../services/accounts');
 const rewards = require('../services/rewards');
+const hunts = require('../services/hunts');
 
 function fail(err) {
   if (err.status) throw new HttpError(err.status, err.message);
@@ -124,6 +125,59 @@ async function handleAdmin(req, res, url) {
   const delBen = /^DELETE \/api\/admin\/benefits\/([^/]+)$/.exec(route);
   if (delBen) {
     try { content.removeRow('benefit', decodeURIComponent(delBen[1])); return sendJson(res, 200, { ok: true }); }
+    catch (err) { fail(err); }
+  }
+
+  const reviewEntry = /^PATCH \/api\/admin\/hunts\/([^/]+)\/entries\/([^/]+)$/.exec(route);
+  if (reviewEntry) {
+    try {
+      return sendJson(res, 200, { item: hunts.reviewEntry(decodeURIComponent(reviewEntry[1]), decodeURIComponent(reviewEntry[2]), await readJson(req)) });
+    } catch (err) { fail(err); }
+  }
+  const delEntry = /^DELETE \/api\/admin\/hunts\/([^/]+)\/entries\/([^/]+)$/.exec(route);
+  if (delEntry) {
+    try {
+      return sendJson(res, 200, { item: hunts.removeEntry(decodeURIComponent(delEntry[1]), decodeURIComponent(delEntry[2])) });
+    } catch (err) { fail(err); }
+  }
+
+  const setAccepting = /^POST \/api\/admin\/hunts\/([^/]+)\/accepting$/.exec(route);
+  if (setAccepting) {
+    try {
+      const body = await readJson(req);
+      return sendJson(res, 200, { item: hunts.setAccepting(decodeURIComponent(setAccepting[1]), body.accepting) });
+    } catch (err) { fail(err); }
+  }
+
+  const closeHunt = /^POST \/api\/admin\/hunts\/([^/]+)\/close$/.exec(route);
+  if (closeHunt) {
+    try { return sendJson(res, 200, { item: hunts.closeHunt(decodeURIComponent(closeHunt[1])) }); }
+    catch (err) { fail(err); }
+  }
+
+  const pickWinner = /^POST \/api\/admin\/hunts\/([^/]+)\/pick-winner$/.exec(route);
+  if (pickWinner) {
+    try { return sendJson(res, 200, { item: hunts.pickWinner(decodeURIComponent(pickWinner[1])) }); }
+    catch (err) { fail(err); }
+  }
+
+  if (route === 'GET /api/admin/hunts') return sendJson(res, 200, { items: hunts.listForStaff(), codeVerifiedOnly: hunts.codeVerifiedOnly() });
+  if (route === 'POST /api/admin/hunts/rules') {
+    try { return sendJson(res, 200, hunts.setRules(await readJson(req))); }
+    catch (err) { fail(err); }
+  }
+  if (route === 'POST /api/admin/hunts') {
+    try { return sendJson(res, 201, { item: hunts.createHunt(await readJson(req)) }); }
+    catch (err) { fail(err); }
+  }
+  const patchHunt = /^PATCH \/api\/admin\/hunts\/([^/]+)$/.exec(route);
+  if (patchHunt) {
+    try { return sendJson(res, 200, { item: hunts.updateHunt(decodeURIComponent(patchHunt[1]), await readJson(req)) }); }
+    catch (err) { fail(err); }
+  }
+  const delHunt = /^DELETE \/api\/admin\/hunts\/([^/]+)$/.exec(route);
+  if (delHunt) {
+    try { hunts.removeHunt(decodeURIComponent(delHunt[1])); return sendJson(res, 200, { ok: true }); }
     catch (err) { fail(err); }
   }
 
