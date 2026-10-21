@@ -59,7 +59,7 @@
     const form = h('form', { class: 'studio-login', autocomplete: 'on', novalidate: '' },
       h('span', { class: 'eyebrow' }, 'Staff'),
       h('h1', {}, 'Studio'),
-      h('p', { class: 'muted' }, 'Use the ADMIN_PASSWORD from .env. This URL is not in the public navigation.'),
+      h('p', { class: 'muted' }, 'Staff password from the server env. This page is not linked on the public site.'),
       field('Password', password),
       status,
       h('button', { class: 'btn', type: 'submit' }, 'Log in')
@@ -88,7 +88,8 @@
         setNote(status, err.message, true);
       }
     });
-    app.replaceChildren(h('div', { class: 'studio-shell' }, form));
+    app.replaceChildren(h('div', { class: 'studio-shell studio-login-shell' },
+      h('div', { class: 'studio-login-card' }, form)));
     password.focus();
   }
 
@@ -192,8 +193,9 @@
       field('Reward category', category),
       field('Title', title),
       field('Details', body),
-      field('Amount (USD)', amount),
-      field('Button label', ctaLabel),
+      h('div', { class: 'studio-grid' },
+        field('Amount (USD)', amount),
+        field('Button label', ctaLabel)),
       field('Button link', ctaUrl),
       h('label', { class: 'studio-check' }, published, h('span', {}, 'Published')),
       status,
@@ -233,7 +235,7 @@
         list.append(h('article', { class: 'studio-item' + (row.published ? '' : ' is-draft') + (kind === 'benefit' && state.editingBenefitId === row.id ? ' is-editing' : '') },
           h('div', {},
             h('p', { class: 'studio-item-meta' },
-              row.published ? 'Published' : 'Draft',
+              h('span', { class: 'studio-badge' + (row.published ? ' is-ok' : ' is-warn') }, row.published ? 'Published' : 'Draft'),
               cat ? ' · ' + cat.label : '',
               row.amount != null ? ' · $' + Number(row.amount).toLocaleString('en-US') : ''),
             h('h4', {}, row.title),
@@ -250,6 +252,7 @@
     const amount = h('input', { type: 'number', min: '0', max: '99999999', step: '1', value: String(wheel.prizePool ?? 50), required: '' });
     const form = h('form', { class: 'studio-form' },
       h('h3', {}, 'Monthly prize pool'),
+      h('p', { class: 'studio-stat' }, (wheel.eligibleCount || 0) + ' eligible this month · ' + (wheel.winnersCount || 3) + ' winners · $' + Number(wheel.ticketUsd || 1000).toLocaleString('en-US') + ' raw = 1 ticket'),
       h('p', { class: 'muted' }, 'This is the only wheel setting. Three winners are drawn automatically at UTC month end, weighted by tickets. The prize pool is split equally among them. Visitors cannot run the draw. The site records the full 3-winner spin and posts that video to Discord if DISCORD_WHEEL_WEBHOOK is set.'),
       field('Prize pool (USD)', amount),
       status,
@@ -274,12 +277,10 @@
             ? 'Discord: posted' + (last.discord.hasVideo ? ' with video' : '') + ' at ' + last.discord.postedAt
             : 'Discord: webhook is set. The spin video posts automatically after the UTC month-end draw.')
           : 'Discord: not configured. Create a channel webhook and set DISCORD_WHEEL_WEBHOOK.'))
-      : h('p', { class: 'muted' }, 'No closed month has been drawn yet. The wheel starts this race month. The first automatic draw runs after UTC month end.');
-    return h('section', { class: 'studio-card' },
-      h('h2', {}, 'Monthly wheel'),
-      h('p', { class: 'muted' }, (wheel.eligibleCount || 0) + ' eligible this month · ' + (wheel.winnersCount || 3) + ' winners · pool split equally · $' + Number(wheel.ticketUsd || 1000).toLocaleString('en-US') + ' raw = 1 ticket'),
+      : h('p', { class: 'studio-empty' }, 'No closed month has been drawn yet. The wheel starts this race month. The first automatic draw runs after UTC month end.');
+    return h('div', { class: 'studio-page' },
       form,
-      lastBlock);
+      h('section', { class: 'studio-card' }, lastBlock));
   }
 
   function prizesPanel(onRefresh) {
@@ -337,7 +338,7 @@
           await onRefresh();
         } catch (err) { setNote(status, err.message, true); }
       });
-      return h('section', { class: 'studio-card' }, form);
+      return form;
     }
     function bonusesCard() {
       const status = note();
@@ -359,9 +360,10 @@
       const form = h('form', { class: 'studio-form' },
         h('h3', {}, 'Bonuses given so far'),
         h('p', { class: 'muted' }, 'These running totals appear on the public home page after Community. They are amounts already paid, not this month’s prize pools. Leave a field blank to hide that figure.'),
-        field('Leaderboard bonuses (USD)', leaderboard),
-        field('Level-up bonuses (USD)', levelUp),
-        field('Social giveaways (USD)', social),
+        h('div', { class: 'studio-grid studio-grid-3' },
+          field('Leaderboard bonuses (USD)', leaderboard),
+          field('Level-up bonuses (USD)', levelUp),
+          field('Social giveaways (USD)', social)),
         status,
         h('button', { class: 'btn small', type: 'submit' }, 'Save bonuses')
       );
@@ -380,7 +382,7 @@
           await onRefresh();
         } catch (err) { setNote(status, err.message, true); }
       });
-      return h('section', { class: 'studio-card' }, form);
+      return form;
     }
     return h('div', { class: 'studio-page' },
       boardCard(
@@ -439,21 +441,21 @@
             (row.stakeUser || '—') + ' · claimed ' + (row.claimedCode || 'code') +
             (row.referredHint && row.referredHint.length ? ' · Stake list: ' + row.referredHint.join(', ') : ' · not on referred-users'))),
         reviewActions(row)))
-      : h('p', { class: 'muted' }, 'No code checks waiting. After Unbind, when they submit an owner code again, it comes back here.');
+      : h('p', { class: 'studio-empty' }, 'No code checks waiting. After Unbind, when they submit an owner code again, it comes back here.');
     const refreshBtn = h('button', { class: 'btn small secondary', type: 'button', onclick: () => onRefresh() }, 'Refresh checks');
     return h('section', { class: 'studio-card' },
-      h('h2', {}, 'Code checks'),
-      h('p', { class: 'muted' }, 'Every owner-code submit, including after Unbind, waits here. Use Under code or Not under code. Unbind only clears the name.'),
-      refreshBtn,
+      h('div', { class: 'studio-card-head' },
+        h('p', { class: 'studio-stat' }, pending.length ? pending.length + ' waiting' : 'Queue clear'),
+        refreshBtn),
       queue);
   }
 
   function usersPanel(onRefresh) {
     const rows = state.accounts || [];
     function codeCell(row) {
-      if (row.codeStatus === 'verified') return 'Verified';
-      if (row.codeStatus === 'not_under_code') return 'Not under code';
-      if (row.codeStatus === 'pending') return 'Needs check';
+      if (row.codeStatus === 'verified') return h('span', { class: 'studio-badge is-ok' }, 'Verified');
+      if (row.codeStatus === 'not_under_code') return h('span', { class: 'studio-badge is-off' }, 'Not under code');
+      if (row.codeStatus === 'pending') return h('span', { class: 'studio-badge is-warn' }, 'Needs check');
       return '—';
     }
     const body = rows.length
@@ -464,9 +466,9 @@
         h('td', {}, row.kickName || '—')))
       : [h('tr', {}, h('td', { colspan: '4' }, h('p', { class: 'muted' }, 'No registered users yet.')))];
     return h('section', { class: 'studio-card studio-users-panel' },
-      h('h2', {}, 'Users'),
-      h('p', { class: 'muted' }, 'Registered emails with Stake username, code status, and Kick username.'),
-      h('button', { class: 'btn small secondary', type: 'button', onclick: () => onRefresh() }, 'Refresh users'),
+      h('div', { class: 'studio-card-head' },
+        h('p', { class: 'studio-stat' }, rows.length === 1 ? '1 registered' : rows.length + ' registered'),
+        h('button', { class: 'btn small secondary', type: 'button', onclick: () => onRefresh() }, 'Refresh users')),
       h('div', { class: 'studio-table-wrap' },
         h('table', { class: 'studio-users' },
           h('thead', {}, h('tr', {},
@@ -479,8 +481,7 @@
 
   function laterPanel() {
     return h('section', { class: 'studio-card studio-later' },
-      h('h2', {}, 'Chat'),
-      h('p', { class: 'muted' }, 'On-site chat is not built. Community stays on Discord and Telegram.'));
+      h('p', { class: 'studio-empty' }, 'On-site chat is not built. Community stays on Discord and Telegram.'));
   }
 
   const PAGES = [
@@ -551,12 +552,14 @@
 
   function studioNav(current) {
     const pending = (state.accounts || []).filter((row) => row.codeStatus === 'pending').length;
-    return h('nav', { class: 'studio-nav', 'aria-label': 'Studio sections' },
-      PAGES.map((page) => h('a', {
-        href: '/studio/' + page.id,
-        class: 'studio-nav-link' + (current === page.id ? ' is-active' : ''),
-        'aria-current': current === page.id ? 'page' : null,
-      }, page.label, page.id === 'checks' && pending > 0 ? h('span', { class: 'studio-nav-count' }, String(pending)) : null)));
+    return h('aside', { class: 'studio-aside' },
+      h('p', { class: 'studio-nav-kicker' }, 'Staff tools'),
+      h('nav', { class: 'studio-nav', 'aria-label': 'Studio sections' },
+        PAGES.map((page) => h('a', {
+          href: '/studio/' + page.id,
+          class: 'studio-nav-link' + (current === page.id ? ' is-active' : ''),
+          'aria-current': current === page.id ? 'page' : null,
+        }, page.label, page.id === 'checks' && pending > 0 ? h('span', { class: 'studio-nav-count' }, String(pending)) : null))));
   }
 
   async function loadLists() {
