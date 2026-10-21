@@ -517,6 +517,63 @@ function setRules(body) {
   return { codeVerifiedOnly: codeVerifiedOnly() };
 }
 
+function demoBoard() {
+  const queue = [
+    { position: 1, name: 'Gates of Olympus', bet: BET, result: 48.2, multi: 120.5, pending: false, best: false },
+    { position: 2, name: 'Sweet Bonanza', bet: BET, result: 336.8, multi: 842, pending: false, best: true },
+    { position: 3, name: 'Sugar Rush', bet: BET, result: -0.4, multi: 0, pending: false, best: false },
+    { position: 4, name: 'Swamp King', bet: BET, result: 64, multi: 160, pending: false, best: false },
+    { position: 5, name: 'Wanted Dead or a Wild', bet: BET, result: 16, multi: 40, pending: false, best: false },
+    { position: 6, name: 'Mental', bet: BET, result: 88, multi: 220, pending: false, best: false },
+    { position: 7, name: 'Le Bandit', bet: BET, result: 6, multi: 15, pending: false, best: false },
+    { position: 8, name: 'Tiki Wiki Wild', bet: BET, result: 36, multi: 90, pending: false, best: false },
+    { position: 9, name: 'Dragonspire', bet: BET, result: null, multi: null, pending: true, best: false },
+    { position: 10, name: 'Leviathan', bet: BET, result: null, multi: null, pending: true, best: false },
+  ];
+  return {
+    demo: true,
+    live: true,
+    hunt: {
+      title: 'Saturday bonus hunt',
+      status: 'current',
+      startBalance: START_BALANCE,
+      bet: BET,
+      spins: SPINS,
+      endBalance: 1394.6,
+      streamDate: null,
+      streamTitle: null,
+      accepting: true,
+      prize: 100,
+      winnerName: 'DemoHunt',
+      winnings: 594.6,
+      profit: 594.6,
+      avgMulti: 185.94,
+      bestMulti: 842,
+      bestSlot: 'Sweet Bonanza',
+      biggestWin: 336.8,
+      opened: 8,
+      total: 10,
+      queue,
+      predictions: [
+        { name: 'DemoHunt', finalBalance: 1390, bestMulti: 800, place: 1, winner: true },
+        { name: 'Kai', finalBalance: 1100, bestMulti: 400, place: 2, winner: false },
+        { name: 'NoroFan', finalBalance: 900, bestMulti: 200, place: 3, winner: false },
+        { name: 'StakeAce', finalBalance: 1600, bestMulti: 900, place: 4, winner: false },
+      ],
+    },
+  };
+}
+
+function streamBoard() {
+  const rows = ensureStore().slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  const current = rows.find((hunt) => hunt.status === 'current') || null;
+  const shown = current || rows.find((hunt) => hunt.status === 'previous') || null;
+  return {
+    live: !!current,
+    hunt: shown ? publicHunt(shown) : null,
+  };
+}
+
 function listForStaff() {
   return ensureStore().slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
 }
@@ -542,5 +599,7 @@ module.exports = {
   codeVerifiedOnly,
   setRules,
   listForStaff,
+  streamBoard,
+  demoBoard,
   ownEntry,
 };

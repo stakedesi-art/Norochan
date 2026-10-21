@@ -8,6 +8,7 @@ const SESSION_MS = 12 * 60 * 60 * 1000;
 const IDLE_MS = 2 * 60 * 60 * 1000;
 const WINDOW_MS = 15 * 60 * 1000;
 const sessions = new Map();
+const overlaySessions = new Map();
 const buckets = new Map();
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -32,6 +33,11 @@ function parseCookies(req) {
 function cookieHeader(req, value, maxAgeSec) {
   const secure = cookieSecure(req);
   return `studio=${encodeURIComponent(value)}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${maxAgeSec}` + (secure ? '; Secure' : '');
+}
+
+function overlayCookieHeader(req, value, maxAgeSec) {
+  const secure = cookieSecure(req);
+  return `overlay=${encodeURIComponent(value)}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${maxAgeSec}` + (secure ? '; Secure' : '');
 }
 
 function clientIp(req) {
@@ -75,6 +81,9 @@ function sweep() {
   const now = Date.now();
   for (const [id, row] of sessions) {
     if (row.expires <= now || row.idle <= now) sessions.delete(id);
+  }
+  for (const [id, row] of overlaySessions) {
+    if (row.expires <= now || row.idle <= now) overlaySessions.delete(id);
   }
 }
 
@@ -135,11 +144,43 @@ function endSession(req) {
   return cookieHeader(req, '', 0);
 }
 
+function startOverlaySession(req) {
+  sweep();
+  const token = crypto.randomBytes(32).toString('base64url');
+  const now = Date.now();
+  overlaySessions.set(sha256(token), {
+    expires: now + SESSION_MS,
+    idle: now + IDLE_MS,
+    ip: clientIp(req),
+    ua: uaFinger(req),
+  });
+  return { cookie: overlayCookieHeader(req, token, SESSION_MS / 1000) };
+}
+
+function isOverlay(req) {
+  const token = parseCookies(req).overlay;
+  if (!token) return false;
+  const row = overlaySessions.get(sha256(token));
+  if (!row) return false;
+  const now = Date.now();
+  if (row.expires <= now || row.idle <= now) { overlaySessions.delete(sha256(token)); return false; }
+  if (!sameClient(req, row)) return false;
+  row.idle = now + IDLE_MS;
+  return true;
+}
+
+function endOverlaySession(req) {
+  const token = parseCookies(req).overlay;
+  if (token) overlaySessions.delete(sha256(token));
+  return overlayCookieHeader(req, '', 0);
+}
+
 function clearHits(key) {
   buckets.delete(key);
 }
 
 module.exports = {
   configured, passwordOk, startSession, isStaff, requireStaff, endSession,
+  startOverlaySession, isOverlay, endOverlaySession,
   clientIp, addHit, isBlocked, retryAfter, csrfOf, requireCsrf, clearHits,
 };

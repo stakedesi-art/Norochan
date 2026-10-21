@@ -164,6 +164,9 @@ async function main() {
     check('staff studio page is served off the public nav', studioPage.status === 200 && /Norochan studio/.test(studioPage.text) && /noindex/.test(studioPage.text));
     const studioRoot = record(await call('GET', '/studio'));
     check('staff studio path serves the studio HTML', studioRoot.status === 200 && /Norochan studio/.test(studioRoot.text) && /\/studio\.js/.test(studioRoot.text) && /noindex/.test(studioRoot.text));
+    const overlayPage = record(await call('GET', '/overlay'));
+    check('stream board page is private and off the public nav', overlayPage.status === 200 && /Norochan stream board/.test(overlayPage.text) && /noindex/.test(overlayPage.text) && /\/overlay\.js/.test(overlayPage.text) && !/href="\/overlay"/.test(home.text));
+    check('stream board stays locked without the Studio password', (await call('GET', '/api/admin/overlay')).status === 401);
     const studioUsers = record(await call('GET', '/studio/users'));
     check('staff studio section path serves the studio HTML', studioUsers.status === 200 && /Norochan studio/.test(studioUsers.text) && /\/studio\.js/.test(studioUsers.text));
     check('GET /api/me is empty when signed out', (await call('GET', '/api/me')).status === 200 && (await call('GET', '/api/me')).json.account === null);
@@ -383,6 +386,15 @@ async function main() {
     const called = await call('PATCH', '/api/admin/hunts/' + madeHunt.json.item.id + '/entries/' + entryId, staffOpts({ result: 116.16, multi: 290.4 }));
     const afterCall = await call('GET', '/api/bonus-hunts');
     check('staff total win and multiplier show on the queue', called.status === 200 && afterCall.json.current.queue[0].result === 116.16 && afterCall.json.current.queue[0].multi === 290.4 && afterCall.json.current.winnings === 116.16 && afterCall.json.current.profit === 116.16 && afterCall.json.current.endBalance === 916.16 && afterCall.json.current.bestSlot === 'Swamp King' && afterCall.json.current.biggestWin === 116.16 && afterCall.json.current.opened === 1, JSON.stringify(afterCall.json.current));
+    const overlayBoard = await call('GET', '/api/admin/overlay', { cookie });
+    check('stream board shows the call, multiplier, and win without the player', overlayBoard.status === 200 && overlayBoard.json.live === true && overlayBoard.json.hunt.title === 'October bonus hunt' && overlayBoard.json.hunt.queue[0].name === 'Swamp King' && overlayBoard.json.hunt.queue[0].multi === 290.4 && overlayBoard.json.hunt.queue[0].result === 116.16 && overlayBoard.json.hunt.winnerName === 'Alice_W' && !/alicekick|player@example|accountId|kickName/.test(overlayBoard.text));
+    const overlayLogin = await call('POST', '/api/admin/overlay/login', { body: { password: ADMIN_PASS } });
+    const overlaySet = String(overlayLogin.headers.get('set-cookie') || '');
+    const overlayCookie = overlaySet.split(';')[0];
+    const overlayOnly = await call('GET', '/api/admin/overlay', { cookie: overlayCookie });
+    check('stream board login keeps Studio signed in', overlayLogin.status === 200 && /^overlay=/.test(overlayCookie) && /httponly/i.test(overlaySet) && /samesite=strict/i.test(overlaySet) && /path=\/api\/admin/i.test(overlaySet) && (await call('GET', '/api/admin/session', { cookie })).json.staff === true && overlayOnly.status === 200 && overlayOnly.json.hunt.queue[0].name === 'Swamp King' && !/alicekick|player@example|accountId|kickName/.test(overlayOnly.text));
+    const demoBoard = await call('GET', '/api/admin/overlay?demo=1', { cookie: overlayCookie });
+    check('local demo board shows calls, predictions, and a winner', demoBoard.status === 200 && demoBoard.json.demo === true && demoBoard.json.hunt.queue[1].name === 'Sweet Bonanza' && demoBoard.json.hunt.queue[1].multi === 842 && demoBoard.json.hunt.winnerName === 'DemoHunt' && demoBoard.json.hunt.predictions[0].winner === true && (await call('GET', '/api/admin/overlay?demo=1')).status === 401);
     const implied = await call('PATCH', '/api/admin/hunts/' + madeHunt.json.item.id + '/entries/' + entryId, staffOpts({ result: 0.8, multi: '' }));
     check('blank multiplier falls back to result divided by the bet', implied.status === 200 && (await call('GET', '/api/bonus-hunts')).json.current.queue[0].multi === 2 && (await call('GET', '/api/bonus-hunts')).json.current.queue[0].result === 0.8 && (await call('GET', '/api/bonus-hunts')).json.current.profit === 0.8);
     const loss = await call('PATCH', '/api/admin/hunts/' + madeHunt.json.item.id + '/entries/' + entryId, staffOpts({ result: -20, multi: -50 }));

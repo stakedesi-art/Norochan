@@ -36,6 +36,36 @@ async function handleAdmin(req, res, url) {
     return sendJson(res, 200, { ok: true }, { 'Set-Cookie': staff.endSession(req) });
   }
 
+  if (route === 'POST /api/admin/overlay/login') {
+    if (!staff.configured()) throw new HttpError(503, 'Staff login is not configured. Set ADMIN_PASSWORD (8+ characters) and restart.');
+    const ip = staff.clientIp(req);
+    const key = `overlay:${ip}`;
+    if (staff.isBlocked(key, 8)) throw new HttpError(429, 'Too many login tries. Wait a few minutes.', { 'Retry-After': String(staff.retryAfter(key)) });
+    const body = await readJson(req);
+    if (!staff.passwordOk(body.password)) {
+      staff.addHit(key);
+      throw new HttpError(401, 'Wrong password.');
+    }
+    staff.clearHits(key);
+    const sess = staff.startOverlaySession(req);
+    return sendJson(res, 200, { ok: true }, { 'Set-Cookie': sess.cookie });
+  }
+
+  if (route === 'POST /api/admin/overlay/logout') {
+    return sendJson(res, 200, { ok: true }, { 'Set-Cookie': staff.endOverlaySession(req) });
+  }
+
+  if (route === 'GET /api/admin/overlay') {
+    if (!staff.isStaff(req) && !staff.isOverlay(req)) throw new HttpError(401, 'Staff login required.');
+    if (url.searchParams.get('demo') === '1') {
+      const peer = req.socket && req.socket.remoteAddress;
+      const loopback = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
+      if (!loopback) throw new HttpError(404, 'Not found.');
+      return sendJson(res, 200, hunts.demoBoard());
+    }
+    return sendJson(res, 200, hunts.streamBoard());
+  }
+
   if (route === 'GET /api/admin/session') {
     const on = staff.isStaff(req);
     return sendJson(res, 200, {

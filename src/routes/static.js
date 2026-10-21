@@ -17,10 +17,16 @@ const SPA_PATHS = new Set([
 ]);
 const INDEX = path.join(PUBLIC_DIR, 'index.html');
 const STUDIO = path.join(PUBLIC_DIR, 'studio.html');
+const OVERLAY = path.join(PUBLIC_DIR, 'overlay.html');
 const SITE_CSS_PARTS = [
   'css/tokens.css', 'css/components.css', 'style.css', 'css/theme.css', 'css/decor.css', 'css/fx.css', 'css/identity.css',
 ];
 const LONG_CACHE_EXT = new Set(['.css', '.js', '.woff2', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico']);
+
+function wantsOverlay(rel) {
+  const p = rel.length > 1 && rel.endsWith('/') ? rel.slice(0, -1) : rel;
+  return p === '/overlay' || p === '/overlay.html';
+}
 
 function wantsStudio(rel) {
   const p = rel.length > 1 && rel.endsWith('/') ? rel.slice(0, -1) : rel;
@@ -34,6 +40,7 @@ function wantsStudio(rel) {
 
 function cacheControl(rel, ext, versioned) {
   if (/(?:^|\/)studio\.(html|js)$/.test(rel) || rel === '/css/studio.css') return 'no-store';
+  if (/(?:^|\/)overlay\.(html|js)$/.test(rel) || rel === '/css/overlay.css') return 'no-store';
   if (ext === '.html' || rel === '/index.html') return 'no-cache';
   if (versioned && LONG_CACHE_EXT.has(ext)) return 'public, max-age=31536000, immutable';
   if (ext === '.css' || ext === '.js') return 'no-cache';
@@ -64,7 +71,7 @@ function readSiteCss() {
 
 function wantsSpa(rel) {
   const p = rel.length > 1 && rel.endsWith('/') ? rel.slice(0, -1) : rel;
-  if (wantsStudio(p) || wantsStudio(rel)) return false;
+  if (wantsStudio(p) || wantsStudio(rel) || wantsOverlay(p) || wantsOverlay(rel)) return false;
   if (SPA_PATHS.has(p) || SPA_PATHS.has(rel)) return true;
   if (p.includes('.')) return false;
   return true;
@@ -74,6 +81,7 @@ function sendFile(req, res, file, rel) {
   fs.stat(file, (statErr, stat) => {
     if (statErr || !stat.isFile()) {
       if (wantsStudio(rel)) return sendFile(req, res, STUDIO, '/studio.html');
+      if (wantsOverlay(rel)) return sendFile(req, res, OVERLAY, '/overlay.html');
       if (wantsSpa(rel)) return sendFile(req, res, INDEX, '/index.html');
       return sendJson(res, 404, { error: 'Not found.' });
     }
@@ -86,7 +94,7 @@ function sendFile(req, res, file, rel) {
       ...SEC_HEADERS,
     };
     if (HSTS) headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
-    if (/(?:^|\/)studio\.(html|js)$/.test(rel) || rel === '/css/studio.css') {
+    if (/(?:^|\/)studio\.(html|js)$/.test(rel) || rel === '/css/studio.css' || /(?:^|\/)overlay\.(html|js)$/.test(rel) || rel === '/css/overlay.css') {
       headers['X-Robots-Tag'] = 'noindex, nofollow';
     }
     const htmlShell = ext === '.html' && (rel === '/index.html' || rel === '/studio.html');
@@ -138,6 +146,7 @@ function serveStatic(req, res, url) {
   if (rel === '/css/site.css') return sendSiteCss(req, res);
   if (rel === '/') rel = '/index.html';
   else if (wantsStudio(rel)) rel = '/studio.html';
+  else if (wantsOverlay(rel)) rel = '/overlay.html';
   else if (wantsSpa(rel)) rel = '/index.html';
   const file = path.join(PUBLIC_DIR, path.normalize(rel));
   if (!file.startsWith(PUBLIC_DIR + path.sep)) return sendJson(res, 403, { error: 'Forbidden.' });

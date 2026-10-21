@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Norochan stream board</title>
+  <link rel="icon" href="/img/norochan-logo.png">
+  <link rel="stylesheet" href="/css/overlay.css">
+</head>
+<body>
+  <main id="gate" class="gate" hidden>
+    <form id="login" class="gate-card">
+      <img src="/img/norochan-logo.png" alt="" width="72" height="72">
+      <p class="eyebrow">Kick stream</p>
+      <h1>Norochan stream board</h1>
+      <p class="lede">Use the Studio password. This page is not on the public site.</p>
+      <label class="field">Password
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit">Open board</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </main>
+
+  <div id="board" class="board" hidden>
+    <header class="top">
+      <img src="/img/norochan-logo.png" alt="" width="28" height="28">
+      <div class="brand">
+        <p class="eyebrow">Bonus hunt</p>
+        <h1 id="title">Current hunt</h1>
+      </div>
+      <p id="status" class="pill">Live</p>
+    </header>
+
+    <section class="stats" aria-label="Hunt totals">
+      <p><span>Start</span><strong id="stat-start">$800.00</strong></p>
+      <p><span>End</span><strong id="stat-end">$800.00</strong></p>
+      <p><span>Profit</span><strong id="stat-profit">$0.00</strong></p>
+      <p><span>Best</span><strong id="stat-multi">—</strong></p>
+      <p><span>Biggest</span><strong id="stat-win">—</strong></p>
+      <p><span>Called</span><strong id="stat-called">0/0</strong></p>
+    </section>
+
+    <p id="winner" class="winner" hidden>
+      <span class="eyebrow">Winner</span>
+      <strong id="winner-name"></strong>
+      <span id="winner-prize"></span>
+    </p>
+
+    <div id="scroller" class="scroller">
+      <div id="track" class="track">
+        <div id="reel" class="reel">
+          <section aria-labelledby="calls-heading">
+            <h2 id="calls-heading">Slot calls</h2>
+            <div class="cols">
+              <span></span>
+              <span></span>
+              <span>Multiplier</span>
+              <span>Win</span>
+            </div>
+            <ol id="calls" class="rows"></ol>
+            <p id="calls-empty" class="empty" hidden>No slot calls yet.</p>
+          </section>
+          <section aria-labelledby="picks-heading">
+            <h2 id="picks-heading">Predictions</h2>
+            <div class="cols">
+              <span></span>
+              <span></span>
+              <span>Final balance</span>
+              <span>Predicted<br>multiplier</span>
+            </div>
+            <ol id="picks" class="rows"></ol>
+            <p id="picks-empty" class="empty" hidden>No predictions yet.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+    <button type="button" id="logout" class="logout">Log out</button>
+  </div>
+
+  <p id="missing" class="missing" hidden>No bonus hunt is on the board yet. Open one in Studio and this page will fill in.</p>
+  <script src="/overlay.js" defer></script>
+</body>
+</html>
