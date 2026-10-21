@@ -120,7 +120,7 @@ async function main() {
     check('Kick live payload has the fields the live card uses', ['status', 'channel', 'title', 'viewers', 'thumbnail', 'url'].every((k) => k in kickLive.json));
     const home = record(await call('GET', '/'));
     check('home page served with CSP header', home.status === 200 && /<title>Norochan/.test(home.text) && !!home.headers.get('content-security-policy'));
-    check('public HTML uses clean nav hrefs', /href="\/leaderboard"/.test(home.text) && /href="\/code-benefits"/.test(home.text) && /href="\/account"/.test(home.text) && !/href="\/announcement"/.test(home.text) && !/href="#\/leaderboard"/.test(home.text));
+    check('public HTML uses clean nav hrefs', /href="\/leaderboard"/.test(home.text) && /href="\/code-benefits"/.test(home.text) && /href="\/account"/.test(home.text) && !/href="\/announcement"/.test(home.text) && !/href="#\/leaderboard"/.test(home.text) && /id="age-gate"/.test(home.text) && /\/age\.js/.test(home.text) && /Yes, I am 18 or older/.test(home.text));
     for (const p of ['/leaderboard', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/community', '/support', '/account']) {
       const page = record(await call('GET', p));
       check('SPA ' + p + ' serves the app HTML', page.status === 200 && /<title>Norochan/.test(page.text) && /\/app\.js/.test(page.text) && /text\/html/.test(String(page.headers.get('content-type') || '')));
@@ -137,7 +137,7 @@ async function main() {
     const appJs = record(await call('GET', '/app.js'));
     check('public site has no dark/light theme button', !/id="theme"|theme-mobile|Switch to light theme/.test(home.text) && !/toggleTheme|theme-desktop/.test(appJs.text));
     check('front end never calls old signup or staff-admin APIs', appJs.status === 200 && !/\/api\/(login|signup|profile|connect-provider)|NoroAdmin|#\/admin/.test(appJs.text) && /\/api\/me/.test(appJs.text) && /\/api\/auth\/signup/.test(appJs.text) && /\/api\/verify\/claim/.test(appJs.text) && !/\/api\/verify\/challenge/.test(appJs.text));
-    check('public app uses History API path routing', /addEventListener\('popstate'/.test(appJs.text) && /history\.pushState/.test(appJs.text) && !/consumeLegacyHash/.test(appJs.text) && !/addEventListener\('hashchange'/.test(appJs.text) && !/location\.hash/.test(appJs.text));
+    check('public app uses History API path routing', /addEventListener\('popstate'/.test(appJs.text) && /history\.pushState/.test(appJs.text) && !/consumeLegacyHash/.test(appJs.text) && !/addEventListener\('hashchange'/.test(appJs.text) && !/location\.hash/.test(appJs.text) && /noro-age/.test(appJs.text) && /showModal/.test(appJs.text));
     check('public feed is wired', /\/api\/feed/.test(appJs.text));
     check('public wheel is a live canvas fed by /api/wheel, not hardcoded players', /\/api\/wheel/.test(appJs.text) && /getContext/.test(appJs.text) && /Live draw/.test(appJs.text) && /wheel-countdown/.test(appJs.text) && /strokeText\(label/.test(appJs.text) && !/Alice_W|bobby99|KaiTheGreat/.test(appJs.text) && !/ticketsFromWager/.test(appJs.text));
     check('viewer board keeps podium animation and never fetches BotRix from the browser', /viewerPodium/.test(appJs.text) && /\/api\/viewers\//.test(appJs.text) && /listSkeleton\(3\)/.test(appJs.text) && !/botrix\.live/.test(appJs.text) && !/BOTRIX_API_KEY|BOTRIX_KEY/.test(appJs.text));
@@ -181,7 +181,7 @@ async function main() {
     const setCookie = String(login.headers.get('set-cookie') || '');
     const csrf = login.json && login.json.csrf;
     const staffOpts = (body, extra = {}) => ({ cookie, body, headers: { 'X-Studio-CSRF': csrf, ...extra } });
-    check('studio login sets an HttpOnly SameSite=Strict admin-path cookie', login.status === 200 && /^studio=/.test(cookie) && /httponly/i.test(setCookie) && /samesite=strict/i.test(setCookie) && /path=\/api\/admin/i.test(setCookie));
+    check('studio login sets an HttpOnly SameSite=Strict admin-path cookie', login.status === 200 && /^studio=/.test(cookie) && /httponly/i.test(setCookie) && /samesite=strict/i.test(setCookie) && /path=\/api\/admin/i.test(setCookie) && !/; secure/i.test(setCookie));
     check('studio login returns a CSRF token', typeof csrf === 'string' && csrf.length >= 16);
     check('staff writes reject a mismatched Origin', (await call('POST', '/api/admin/announcements', staffOpts({ title: 'x' }, { Origin: 'https://evil.example' }))).status === 403);
     check('staff writes reject a missing CSRF token', (await call('POST', '/api/admin/announcements', { cookie, body: { title: 'x' } })).status === 403);
@@ -607,6 +607,11 @@ async function main() {
     check('token not in data.json', !saved.includes(TOKEN));
 
     console.log('Migration 001-remove-accounts');
+    const proxied = await call('POST', '/api/admin/login', { body: { password: ADMIN_PASS }, headers: { 'X-Forwarded-Proto': 'https' } });
+    const proxiedCookie = String(proxied.headers.get('set-cookie') || '');
+    check('loopback https proxy marks the staff cookie Secure', proxied.status === 200 && /httponly/i.test(proxiedCookie) && /samesite=strict/i.test(proxiedCookie) && /; secure/i.test(proxiedCookie));
+    const plain = await call('POST', '/api/admin/login', { body: { password: ADMIN_PASS }, headers: { 'X-Forwarded-Proto': 'http' } });
+    check('http proxy does not mark the cookie Secure', plain.status === 200 && !/; secure/i.test(String(plain.headers.get('set-cookie') || '')));
     site.kill();
     await sleep(300);
     const migrate = (...args) => execFileSync('node', [path.join(root, 'scripts/migrations/001-remove-accounts.js'), ...args], { env: { ...process.env, DATA_FILE: dataFile }, encoding: 'utf8' });

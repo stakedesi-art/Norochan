@@ -44,6 +44,16 @@ function readJson(req) {
 function originHost(value) {
   try { return new URL(value).host; } catch { return ''; }
 }
+
+function cookieSecure(req) {
+  if (HSTS || process.env.COOKIE_SECURE === '1' || req.socket.encrypted) return true;
+  const peer = String(req.socket.remoteAddress || '');
+  const loopback = peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1';
+  if (!loopback) return false;
+  const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  return proto === 'https';
+}
+
 function checkOrigin(req, opts = {}) {
   const origin = req.headers.origin;
   if (origin) {
@@ -58,4 +68,4 @@ function checkOrigin(req, opts = {}) {
   }
 }
 
-module.exports = { HttpError, SEC_HEADERS, sendJson, redirect, readJson, checkOrigin };
+module.exports = { HttpError, SEC_HEADERS, sendJson, redirect, readJson, checkOrigin, cookieSecure };

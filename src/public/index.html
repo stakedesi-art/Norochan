@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/css/decor.css">
     <link rel="stylesheet" href="/css/fx.css">
     <link rel="stylesheet" href="/css/identity.css">
+    <script src="/age.js"></script>
   </head>
   <body>
     <a class="skip-link" href="#app">Skip to content</a>
@@ -110,6 +111,25 @@
     <div class="footer-bottom-bar">
       <span>© 2026 norochan.com · All rights reserved</span>
     </div>
+
+    <dialog id="age-gate" class="age-gate" aria-labelledby="age-gate-title">
+      <h2 id="age-gate-title">Age verification</h2>
+      <div data-age-choices>
+        <p>This site has gambling content and is for adults only.</p>
+        <p class="muted">By choosing yes, you confirm that:</p>
+        <ul>
+          <li>You are <strong>18 or older</strong></li>
+          <li>Gambling is legal where you live</li>
+          <li>You will gamble responsibly</li>
+        </ul>
+        <div class="age-gate-actions">
+          <button class="btn" type="button" data-age-yes>Yes, I am 18 or older</button>
+          <button class="btn secondary" type="button" data-age-no>No, I am under 18</button>
+        </div>
+      </div>
+      <p data-age-blocked hidden>This site is only for people who are 18 or older.</p>
+      <p class="age-gate-note">Please gamble responsibly. If gambling is a problem, seek help.</p>
+    </dialog>
 
     <script src="/ui.js" defer></script>
     <script src="/app.js" defer></script>

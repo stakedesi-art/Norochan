@@ -1,5 +1,22 @@
 'use strict';
 (function () {
+  const ageGate = document.getElementById('age-gate');
+  if (ageGate && document.documentElement.dataset.age !== 'ok') {
+    const choices = ageGate.querySelector('[data-age-choices]');
+    const blocked = ageGate.querySelector('[data-age-blocked]');
+    ageGate.addEventListener('cancel', (event) => event.preventDefault());
+    ageGate.querySelector('[data-age-yes]').addEventListener('click', () => {
+      try { localStorage.setItem('noro-age', '18'); } catch { /* storage blocked */ }
+      document.documentElement.dataset.age = 'ok';
+      ageGate.close();
+    });
+    ageGate.querySelector('[data-age-no]').addEventListener('click', () => {
+      choices.hidden = true;
+      blocked.hidden = false;
+    });
+    ageGate.showModal();
+  }
+
   const app = document.getElementById('app');
   const state = { config: null, rewards: null, me: null };
   let timer = null;

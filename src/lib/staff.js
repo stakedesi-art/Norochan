@@ -1,8 +1,7 @@
 'use strict';
 // Staff session for /studio. One env password. No public user accounts (SRS Phase 1).
 const crypto = require('crypto');
-const { HSTS } = require('../config');
-const { HttpError } = require('./http');
+const { HttpError, cookieSecure } = require('./http');
 
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '');
 const SESSION_MS = 12 * 60 * 60 * 1000;
@@ -31,7 +30,7 @@ function parseCookies(req) {
 }
 
 function cookieHeader(req, value, maxAgeSec) {
-  const secure = HSTS || process.env.COOKIE_SECURE === '1' || !!req.socket.encrypted;
+  const secure = cookieSecure(req);
   return `studio=${encodeURIComponent(value)}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${maxAgeSec}` + (secure ? '; Secure' : '');
 }
 

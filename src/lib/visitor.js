@@ -1,7 +1,7 @@
 'use strict';
 // Visitor session cookie (`sid=`). Separate from the staff `studio=` cookie.
 const crypto = require('crypto');
-const { HSTS } = require('../config');
+const { cookieSecure } = require('./http');
 
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -16,7 +16,7 @@ function parseCookies(req) {
 }
 
 function cookieHeader(req, value, maxAgeSec) {
-  const secure = HSTS || process.env.COOKIE_SECURE === '1' || !!req.socket.encrypted;
+  const secure = cookieSecure(req);
   return `sid=${encodeURIComponent(value)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAgeSec}` + (secure ? '; Secure' : '');
 }
 
