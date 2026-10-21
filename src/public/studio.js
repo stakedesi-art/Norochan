@@ -2,7 +2,7 @@
 (function () {
   const app = document.getElementById('studio-app');
   const logoutBtn = document.getElementById('studio-logout');
-  const state = { categories: [], announcements: [], benefits: [], wheel: null, prizes: null, accounts: [], page: 'users', editingBenefitId: null };
+  const state = { categories: [], announcements: [], benefits: [], wheel: null, prizes: null, accounts: [], page: 'users', editingBenefitId: null, userSearch: '' };
   let renderDash = null;
   let csrf = '';
   let bootGen = 0;
@@ -458,17 +458,48 @@
       if (row.codeStatus === 'pending') return h('span', { class: 'studio-badge is-warn' }, 'Needs check');
       return '—';
     }
-    const body = rows.length
-      ? rows.map((row) => h('tr', {},
+    const search = h('input', {
+      type: 'search',
+      class: 'studio-search',
+      placeholder: 'Search Stake username',
+      'aria-label': 'Search Stake username',
+      autocomplete: 'off',
+      spellcheck: 'false',
+      value: state.userSearch || '',
+    });
+    const stat = h('p', { class: 'studio-stat' });
+    const tbody = h('tbody', {});
+    function paint() {
+      const q = String(search.value || '').trim().toLowerCase();
+      state.userSearch = search.value;
+      const shown = q
+        ? rows.filter((row) => String(row.stakeUser || '').toLowerCase().includes(q))
+        : rows;
+      if (!rows.length) {
+        stat.textContent = '0 registered';
+        tbody.replaceChildren(h('tr', {}, h('td', { colspan: '4' }, h('p', { class: 'muted' }, 'No registered users yet.'))));
+        return;
+      }
+      if (q) stat.textContent = shown.length + ' of ' + rows.length;
+      else stat.textContent = rows.length === 1 ? '1 registered' : rows.length + ' registered';
+      if (!shown.length) {
+        tbody.replaceChildren(h('tr', {}, h('td', { colspan: '4' }, h('p', { class: 'studio-empty' }, 'No Stake username matches that search.'))));
+        return;
+      }
+      tbody.replaceChildren(...shown.map((row) => h('tr', {},
         h('td', {}, row.email || '—'),
         h('td', {}, row.stakeUser || '—'),
         h('td', { class: row.codeStatus === 'verified' ? 'is-verified' : row.codeStatus === 'not_under_code' ? 'is-not-code' : '' }, codeCell(row)),
-        h('td', {}, row.kickName || '—')))
-      : [h('tr', {}, h('td', { colspan: '4' }, h('p', { class: 'muted' }, 'No registered users yet.')))];
+        h('td', {}, row.kickName || '—'))));
+    }
+    search.addEventListener('input', paint);
+    paint();
     return h('section', { class: 'studio-card studio-users-panel' },
       h('div', { class: 'studio-card-head' },
-        h('p', { class: 'studio-stat' }, rows.length === 1 ? '1 registered' : rows.length + ' registered'),
-        h('button', { class: 'btn small secondary', type: 'button', onclick: () => onRefresh() }, 'Refresh users')),
+        search,
+        h('div', { class: 'studio-card-tools' },
+          stat,
+          h('button', { class: 'btn small secondary', type: 'button', onclick: () => onRefresh() }, 'Refresh users'))),
       h('div', { class: 'studio-table-wrap' },
         h('table', { class: 'studio-users' },
           h('thead', {}, h('tr', {},
@@ -476,7 +507,7 @@
             h('th', {}, 'Stake username'),
             h('th', {}, 'Code'),
             h('th', {}, 'Kick username'))),
-          h('tbody', {}, body))));
+          tbody)));
   }
 
   function laterPanel() {
