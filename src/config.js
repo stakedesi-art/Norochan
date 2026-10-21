@@ -72,7 +72,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '127.0.0.1'; // use 0.0.0.0 when hosting online
 // Send Strict-Transport-Security once the site is served over HTTPS. COOKIE_SECURE is the old name.
 const HSTS = process.env.HSTS === '1' || process.env.COOKIE_SECURE === '1';
-const RAW_STAKE_BASE = process.env.STAKE_API_BASE || 'https://api.stake.com/affiliate';
+const RAW_STAKE_BASE = process.env.STAKE_API_BASE || 'https://api.stake.jp/affiliate';
 const STAKE_BASE = RAW_STAKE_BASE.replace(/\/api\/?$/i, '').replace(/\/+$/, '');
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 // Public prize pool / bonus figures, edited by hand on the server (see src/data/rewards.example.json).

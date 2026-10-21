@@ -2,6 +2,9 @@
 // Stake affiliate API client (read-only), local CSV fallback, and the in-memory race leaderboard.
 // Last good data is kept in memory. Real usernames never leave the server.
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
+const zlib = require('zlib');
 const {
   CONFIG, STAKE_BASE, STAKE_EXCLUSIVE, ALL_CAMPAIGNS, RACE_CAMPAIGN_CODE, LEADERBOARD_CSV,
 } = require('../config');
@@ -85,39 +88,153 @@ function readCsvFallbacks(force = false) {
 
 // ============================================================
 // Stake affiliate API
+// Native fetch on Node 20+ adds extra Accept-Encoding values that Stake
+// answers with 406. http/https.request sends only the headers below.
+// Datacenter IPs often get 406 from api.stake.jp; api.stake.com still works.
 // ============================================================
+const STAKE_FALLBACK_BASES = [
+  'https://api.stake.jp/affiliate',
+  'https://api.stake.com/affiliate',
+];
+const STAKE_TIMEOUT_MS = 20000;
+const STAKE_RETRY_STATUSES = new Set([406, 502, 503]);
+let stickyStakeBase = null;
+
+function normalizeAffiliateBase(raw) {
+  let s = String(raw || '').trim().replace(/\/+$/, '');
+  s = s.replace(/\/api\/?$/i, '');
+  if (/^https:\/\/api\.stake\.(jp|com)$/i.test(s)) return s + '/affiliate';
+  return s;
+}
+
+function isLoopbackBase(base) {
+  try {
+    const host = new URL(base).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  } catch {
+    return false;
+  }
+}
+
+function stakeBases() {
+  const configured = normalizeAffiliateBase(STAKE_BASE);
+  if (isLoopbackBase(configured)) return [configured];
+  const out = [];
+  const seen = new Set();
+  for (const base of [stickyStakeBase, ...STAKE_FALLBACK_BASES, configured]) {
+    const n = normalizeAffiliateBase(base);
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
+function stakeHeaders(token) {
+  return {
+    'x-access-token': token,
+    Accept: 'text/csv',
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'en',
+    'User-Agent': 'norochan-web/1.0',
+  };
+}
+
+function decodeStakeBody(res) {
+  return new Promise((resolve, reject) => {
+    const enc = String(res.headers['content-encoding'] || '').toLowerCase();
+    let stream = res;
+    if (enc.includes('gzip')) stream = res.pipe(zlib.createGunzip());
+    else if (enc.includes('deflate')) stream = res.pipe(zlib.createInflate());
+    const chunks = [];
+    stream.on('data', (c) => chunks.push(c));
+    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    stream.on('error', reject);
+  });
+}
+
+function stakeRequest(url, token) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const lib = u.protocol === 'http:' ? http : https;
+    const req = lib.request({
+      protocol: u.protocol,
+      hostname: u.hostname,
+      port: u.port || undefined,
+      path: u.pathname + u.search,
+      method: 'GET',
+      headers: stakeHeaders(token),
+    }, async (res) => {
+      try {
+        const body = await decodeStakeBody(res);
+        resolve({ status: res.statusCode || 0, body, url: u });
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.setTimeout(STAKE_TIMEOUT_MS, () => {
+      req.destroy(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function isRetryableStakeFailure(err, status) {
+  if (STAKE_RETRY_STATUSES.has(status)) return true;
+  const code = err && (err.code || err.cause && err.cause.code || err.name);
+  return ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'AbortError', 'TimeoutError'].includes(String(code));
+}
+
+function classifyStakeResponse(status, body) {
+  const looksLikeHtml = /^\s*</.test(body);
+  if (status === 403 && looksLikeHtml) {
+    return new StakeError('Blocked by Cloudflare or wrong host (status 403)', 'blocked');
+  }
+  if (status === 401 || (status === 403 && !looksLikeHtml)) {
+    return new StakeError(`Token rejected (status ${status}). Check STAKE_TOKEN and set STAKE_API_BASE to the correct host if needed.`, 'auth');
+  }
+  if (status < 200 || status >= 300) {
+    return new StakeError(`Stake API returned HTTP ${status}: ${body.slice(0, 200).replace(/\s+/g, ' ')}`, 'http');
+  }
+  return null;
+}
+
 async function stakeGet(pathname, params) {
   const token = process.env.STAKE_TOKEN;
   if (!token) throw new StakeError('STAKE_TOKEN environment variable is not set.', 'no_token');
-  const url = new URL(STAKE_BASE + pathname);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  console.log(`[stake] GET ${url.pathname}${url.search}`);
-  let res;
-  try {
-    res = await fetch(url, {
-      headers: {
-        'x-access-token': token,
-        Accept: 'text/csv',
-        'User-Agent': 'NorochanSite/1.0',
-      },
-      signal: AbortSignal.timeout(20000),
-      redirect: 'error', // never forward the token to a redirect target
-    });
-  } catch (err) {
-    throw new StakeError(`Could not reach Stake API (${err.cause?.code || err.name}).`, 'network');
+  const bases = stakeBases();
+  let lastErr = null;
+  for (let i = 0; i < bases.length; i++) {
+    const base = bases[i];
+    const url = new URL(base + pathname);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+    console.log(`[stake] GET ${url.pathname}${url.search}` + (url.host ? ` host=${url.host}` : ''));
+    let result;
+    try {
+      result = await stakeRequest(url, token);
+    } catch (err) {
+      lastErr = new StakeError(`Could not reach Stake API (${(err.cause && err.cause.code) || err.code || err.name}).`, 'network');
+      if (i < bases.length - 1 && isRetryableStakeFailure(err, 0)) {
+        console.warn(`[stake] ${url.host} failed (${err.code || err.name}); trying next host.`);
+        continue;
+      }
+      throw lastErr;
+    }
+    const err = classifyStakeResponse(result.status, result.body);
+    if (!err) {
+      stickyStakeBase = base;
+      return result.body;
+    }
+    lastErr = err;
+    if (err.kind === 'auth') throw err;
+    if (i < bases.length - 1 && isRetryableStakeFailure(err, result.status)) {
+      console.warn(`[stake] HTTP ${result.status} from ${url.host}; trying next host.`);
+      continue;
+    }
+    throw err;
   }
-  const body = await res.text();
-  const looksLikeHtml = /^\s*</.test(body);
-  if (res.status === 403 && looksLikeHtml) {
-    throw new StakeError('Blocked by Cloudflare or wrong host (status 403)', 'blocked');
-  }
-  if (res.status === 401 || (res.status === 403 && !looksLikeHtml)) {
-    throw new StakeError(`Token rejected (status ${res.status}). Check STAKE_TOKEN and set STAKE_API_BASE to the correct host if needed.`, 'auth');
-  }
-  if (!res.ok) {
-    throw new StakeError(`Stake API returned HTTP ${res.status}: ${body.slice(0, 200).replace(/\s+/g, ' ')}`, 'http');
-  }
-  return body;
+  throw lastErr || new StakeError('Could not reach Stake API.', 'network');
 }
 
 function monthRangeForOffset(monthOffset = 0) {

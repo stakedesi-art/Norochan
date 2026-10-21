@@ -26,7 +26,7 @@ node server.js
 ```
 The variable only lives in that terminal window. Open http://localhost:3000.
 
-If the terminal prints `Stake rejected the token (HTTP 401/403)`, the API host may differ for stake.jp. Set `STAKE_API_BASE` to the correct host (same way as above, for example `export STAKE_API_BASE=https://...`). The default is `https://api.stake.com/affiliate`.
+If the terminal prints `Stake rejected the token (HTTP 401/403)`, the API host may differ for stake.jp. The site tries `https://api.stake.jp/affiliate` then `https://api.stake.com/affiliate` on 406/502/503/timeout. Override with `STAKE_API_BASE` only for a mock or a specific host.
 
 ## Try it without a token
 ```
@@ -58,7 +58,7 @@ docs/                  design notes, AWS_DEPLOYMENT.md, AUTH_REMOVAL_REPORT.md
 | Variable | Default | Meaning |
 |---|---|---|
 | `STAKE_TOKEN` | none | Your affiliate token (required for real data) |
-| `STAKE_API_BASE` | `https://api.stake.com/affiliate` | API host |
+| `STAKE_API_BASE` | `https://api.stake.jp/affiliate` | Preferred host; the client also retries `api.stake.com` |
 | `PORT` / `HOST` | `3000` / `127.0.0.1` | Use `HOST=0.0.0.0` on a server |
 | `HSTS` | off | Set `1` once you serve over HTTPS (`COOKIE_SECURE=1` still works as the old name) |
 | `DATA_FILE` | `src/data.json` | BotRix snapshots (keep it outside the code folder on a server) |

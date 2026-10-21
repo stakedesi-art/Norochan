@@ -1,9 +1,7 @@
 'use strict';
-
-const base = process.env.STAKE_API_BASE || 'https://api.stake.com/affiliate';
-const token = process.env.STAKE_TOKEN;
-if (!token) throw new Error('STAKE_TOKEN is not set');
-const headers = { 'x-access-token': token, Accept: 'text/csv', 'User-Agent': 'NorochanDebug/1.0' };
+// Probe Stake affiliate leaderboard through the same server-side client the site uses.
+require('../src/config');
+const { stakeGet } = require('../src/services/stake');
 
 function parseCsv(text) {
   const rows = [];
@@ -35,18 +33,21 @@ function parseCsv(text) {
   return rows;
 }
 
-async function runCase(label, url) {
-  const res = await fetch(url, { headers, redirect: 'manual' });
-  const text = await res.text();
-  const rows = parseCsv(text);
-  const header = rows[0] ? rows[0].join(',') : '';
-  const count = rows.length > 1 ? rows.length - 1 : 0;
-  console.log(`${label}: status=${res.status} rows=${count} header=${header}`);
+async function runCase(label, params) {
+  try {
+    const text = await stakeGet('/leaderboard', params);
+    const rows = parseCsv(text);
+    const header = rows[0] ? rows[0].join(',') : '';
+    const count = rows.length > 1 ? rows.length - 1 : 0;
+    console.log(`${label}: status=200 rows=${count} header=${header}`);
+  } catch (err) {
+    console.log(`${label}: FAILED ${err.message}`);
+  }
 }
 
 (async () => {
   const start = 1790812800000;
   const end = 1793491199999;
-  await runCase('currentMonth', `${base}/leaderboard?timePeriod=currentMonth&isStakeExclusive=false&limit=100&offset=0`);
-  await runCase('customRangeOct2026', `${base}/leaderboard?timePeriod=customRange&isStakeExclusive=false&limit=100&offset=0&startDate=${start}&endDate=${end}`);
+  await runCase('currentMonth', { timePeriod: 'currentMonth', isStakeExclusive: false, limit: 50, offset: 0 });
+  await runCase('customRangeOct2026', { timePeriod: 'customRange', isStakeExclusive: false, limit: 50, offset: 0, startDate: start, endDate: end });
 })();

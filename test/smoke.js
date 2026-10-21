@@ -142,6 +142,11 @@ async function main() {
     check('public wheel is a live canvas fed by /api/wheel, not hardcoded players', /\/api\/wheel/.test(appJs.text) && /getContext/.test(appJs.text) && /Live draw/.test(appJs.text) && /wheel-countdown/.test(appJs.text) && /strokeText\(label/.test(appJs.text) && !/Alice_W|bobby99|KaiTheGreat/.test(appJs.text) && !/ticketsFromWager/.test(appJs.text));
     check('viewer board keeps podium animation and never fetches BotRix from the browser', /viewerPodium/.test(appJs.text) && /\/api\/viewers\//.test(appJs.text) && /listSkeleton\(3\)/.test(appJs.text) && !/botrix\.live/.test(appJs.text) && !/BOTRIX_API_KEY|BOTRIX_KEY/.test(appJs.text));
     check('leaderboard UI can mark the signed-in row as (you)', /you-tag/.test(appJs.text) && /\(you\)/.test(appJs.text));
+    check('browser never calls Stake or carries the affiliate token', !/api\.stake\.(jp|com)/.test(appJs.text) && !/STAKE_TOKEN|x-access-token/.test(appJs.text) && /\/api\/leaderboard/.test(appJs.text));
+    const stakeSrc = fs.readFileSync(path.join(root, 'src/services/stake.js'), 'utf8');
+    const debugStakeSrc = fs.readFileSync(path.join(root, 'scripts/debug-stake.js'), 'utf8');
+    check('stake client pins gzip/deflate and falls back from api.stake.jp to api.stake.com', /'Accept-Encoding': 'gzip, deflate'/.test(stakeSrc) && /'User-Agent': 'norochan-web\/1.0'/.test(stakeSrc) && /https:\/\/api\.stake\.jp\/affiliate/.test(stakeSrc) && /https:\/\/api\.stake\.com\/affiliate/.test(stakeSrc) && /STAKE_RETRY_STATUSES = new Set\(\[406, 502, 503\]\)/.test(stakeSrc) && !/\bfetch\(/.test(stakeSrc));
+    check('debug Stake probe uses the same server-side client', /require\('\.\.\/src\/services\/stake'\)/.test(debugStakeSrc) && /stakeGet\('\/leaderboard'/.test(debugStakeSrc));
     check('account page can connect Kick', /\/auth\/kick\/connect/.test(appJs.text) && /Connect Kick/.test(appJs.text) && !/Continue with Kick/.test(appJs.text));
     check('Account chip uses the Stake username and first letter', /paintNavAccount/.test(appJs.text) && /nav-account-mark/.test(appJs.text) && /stakeUser/.test(appJs.text));
     check('public home does not render the prize-place rewards grid', !/reward-grid/.test(appJs.text) && !/Place ' \+ String\(rank\)/.test(appJs.text) && !/rewardFiller/.test(appJs.text));
