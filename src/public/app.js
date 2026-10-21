@@ -156,8 +156,11 @@
     if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
     const cssSize = Math.max(160, Math.round(canvas.clientWidth || 320));
-    canvas.width = cssSize * dpr;
-    canvas.height = cssSize * dpr;
+    const bufW = Math.round(cssSize * dpr);
+    if (canvas.width !== bufW || canvas.height !== bufW) {
+      canvas.width = bufW;
+      canvas.height = bufW;
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssSize, cssSize);
     const cx = cssSize / 2;
@@ -964,7 +967,9 @@
       }
     }
 
+    let wheelOnScreen = false;
     function loop() {
+      if (!panel.isConnected) { wheelRaf = null; return; }
       if (spinJob) {
         const now = performance.now();
         const t = Math.min(1, (now - spinJob.t0) / spinJob.ms);
@@ -972,7 +977,7 @@
         rotation = spinJob.start + (spinJob.target - spinJob.start) * e(t);
         paint();
         if (t >= 1) { const done = spinJob.resolve; spinJob = null; done(); }
-      } else if (!spinning) {
+      } else if (!spinning && wheelOnScreen) {
         idle = true;
         rotation += 0.007;
         paint();
@@ -1008,11 +1013,18 @@
           boardToggle)),
       board
     );
-    if (window.ResizeObserver) new ResizeObserver(paint).observe(visual);
+    if (window.ResizeObserver) new ResizeObserver(() => { if (wheelOnScreen) paint(); }).observe(visual);
     else window.addEventListener('resize', paint);
+    if (window.IntersectionObserver) {
+      new IntersectionObserver((entries) => {
+        const visible = entries.some((entry) => entry.isIntersecting);
+        if (visible && !wheelOnScreen) paint();
+        wheelOnScreen = visible;
+      }, { rootMargin: '180px' }).observe(visual);
+    } else wheelOnScreen = true;
     stopWheelPoll();
     load();
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(paint);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (wheelOnScreen) paint(); });
     wheelPollTimer = setInterval(load, 60000);
     wheelTickTimer = setInterval(tickClock, 250);
     wheelRaf = requestAnimationFrame(loop);
@@ -1246,18 +1258,30 @@
     const onLeave = () => { mx = null; my = null; };
     const tick = () => {
       if (!layer.isConnected) { moneyRainRaf = null; return; }
-      if (mx != null) impulse(mx, my, 1.6);
+      const moving = mx != null || notes.some((note) => Math.abs(note.vx) > 0.2 || Math.abs(note.vy) > 0.2);
+      if (!moving) { moneyRainRaf = null; return; }
+      const boxes = notes.map((note) => note.el.getBoundingClientRect());
       const layerBox = layer.getBoundingClientRect();
-      notes.forEach((note) => {
+      if (mx != null) {
+        notes.forEach((note, i) => {
+          const box = boxes[i];
+          const dx = box.left + box.width / 2 - mx;
+          const dy = box.top + box.height / 2 - my;
+          const dist = Math.hypot(dx, dy) || 1;
+          if (dist > 170) return;
+          const force = (1 - dist / 170) * 1.6;
+          note.vx += (dx / dist) * force;
+          note.vy += (dy / dist) * force;
+        });
+      }
+      notes.forEach((note, i) => {
         note.vx *= 0.9;
         note.vy *= 0.9;
-        note.x = note.x * 0.82 + note.vx;
-        note.y = note.y * 0.82 + note.vy;
-        note.x = Math.max(-90, Math.min(90, note.x));
-        note.y = Math.max(-90, Math.min(90, note.y));
+        note.x = Math.max(-90, Math.min(90, note.x * 0.82 + note.vx));
+        note.y = Math.max(-90, Math.min(90, note.y * 0.82 + note.vy));
         note.el.style.setProperty('--push-x', note.x.toFixed(2) + 'px');
         note.el.style.setProperty('--push-y', note.y.toFixed(2) + 'px');
-        const box = note.el.getBoundingClientRect();
+        const box = boxes[i];
         const cx = box.left + box.width / 2;
         const cy = box.top + box.height / 2;
         const clipped = box.top > layerBox.bottom - 2;
@@ -1273,6 +1297,7 @@
       });
       moneyRainRaf = requestAnimationFrame(tick);
     };
+    const wake = () => { if (!moneyRainRaf) moneyRainRaf = requestAnimationFrame(tick); };
     layer.querySelectorAll('.norochan-money-note').forEach((noteEl, i) => {
       noteEl.addEventListener('animationiteration', () => {
         const note = notes[i];
@@ -1286,40 +1311,33 @@
     });
     const stage = layer.closest('.hero-stage') || layer.parentElement;
     if (stage) {
-      stage.addEventListener('pointermove', onMove, { passive: true });
-      stage.addEventListener('pointerdown', onDown);
+      stage.addEventListener('pointermove', (event) => { onMove(event); wake(); }, { passive: true });
+      stage.addEventListener('pointerdown', (event) => { onDown(event); wake(); });
       stage.addEventListener('pointerleave', onLeave);
     }
-    moneyRainRaf = requestAnimationFrame(tick);
   }
 
   function homeMoneyRain() {
     const layer = h('div', { class: 'norochan-money-rain', 'aria-hidden': 'true' });
-    const width = window.innerWidth;
-    const count = width <= 720 ? 10 : width <= 1100 ? 16 : 24;
-    const depths = ['bg', 'mid', 'front', 'bg', 'mid'];
-    for (let i = 0; i < count; i++) {
-      const face = h('span', { class: 'norochan-money-note-face' }, MONEY_ICONS[i % MONEY_ICONS.length]);
-      const push = h('div', { class: 'norochan-money-note-push' }, face);
-      layer.append(h('div', { class: 'norochan-money-note norochan-money-note--' + depths[i % depths.length] }, push));
-    }
-    bindMoneyCursor(layer);
+    const fill = () => {
+      if (!layer.isConnected || layer.childElementCount || prefersReducedMotion()) return;
+      const width = window.innerWidth;
+      const count = width <= 720 ? 10 : width <= 1100 ? 16 : 24;
+      const depths = ['bg', 'mid', 'front', 'bg', 'mid'];
+      for (let i = 0; i < count; i++) {
+        const face = h('span', { class: 'norochan-money-note-face' }, MONEY_ICONS[i % MONEY_ICONS.length]);
+        const push = h('div', { class: 'norochan-money-note-push' }, face);
+        layer.append(h('div', { class: 'norochan-money-note norochan-money-note--' + depths[i % depths.length] }, push));
+      }
+      bindMoneyCursor(layer);
+    };
+    if (window.requestIdleCallback) requestIdleCallback(fill, { timeout: 900 });
+    else requestAnimationFrame(() => requestAnimationFrame(fill));
     return layer;
   }
 
-  function homeView() {
+  function communityCards() {
     const c = state.config || {};
-    const prizePool = rewardFigure('currentPrizePool');
-    const race = c.race || { title: 'Wager Race', top: 10 };
-    const copyMsg = h('span', { class: 'muted', role: 'status' });
-    const copyBtn = h('button', {
-      class: 'btn small secondary', type: 'button',
-      onclick: async () => {
-        try { await navigator.clipboard.writeText(c.code || 'Norochan'); copyMsg.textContent = 'Copied ✓'; }
-        catch { copyMsg.textContent = 'Select the code to copy it'; }
-        setTimeout(() => { copyMsg.textContent = ''; }, 2500);
-      },
-    }, 'Copy code');
     const blurbs = {
       discord: 'Join the Norochan community.',
       telegram: 'Community messages.',
@@ -1329,7 +1347,7 @@
       instagram: 'Photos and clips.',
     };
     const names = { discord: 'Discord', telegram: 'Telegram', x: 'X', youtube: 'YouTube', kick: 'Kick', instagram: 'Instagram' };
-    const links = Object.entries(names).map(([k, label]) => {
+    return Object.entries(names).map(([k, label]) => {
       const link = c.links && c.links[k];
       const copy = h('span', { class: 'community-copy' },
         h('span', { class: 'social-label' }, label),
@@ -1344,6 +1362,22 @@
         copy,
         h('span', { class: 'community-cta' }, 'Open'));
     });
+  }
+
+  function homeView() {
+    const c = state.config || {};
+    const prizePool = rewardFigure('currentPrizePool');
+    const race = c.race || { title: 'Wager Race', top: 10 };
+    const copyMsg = h('span', { class: 'muted', role: 'status' });
+    const copyBtn = h('button', {
+      class: 'btn small secondary', type: 'button',
+      onclick: async () => {
+        try { await navigator.clipboard.writeText((state.config && state.config.code) || 'Norochan'); copyMsg.textContent = 'Copied ✓'; }
+        catch { copyMsg.textContent = 'Select the code to copy it'; }
+        setTimeout(() => { copyMsg.textContent = ''; }, 2500);
+      },
+    }, 'Copy code');
+    const links = communityCards();
     const moneyRain = homeMoneyRain();
     const feed = feedMounts();
     const codeRace = h('section', { class: 'dashboard-grid section-block', id: 'affiliate', 'data-spy': 'home' },
@@ -1354,17 +1388,17 @@
         h('p', { class: 'muted' }, 'Wagers under this code count toward the monthly race.'),
         h('div', { class: 'promo-code-box' },
           h('span', { class: 'label' }, 'Code'),
-          h('span', { class: 'code' }, c.code || 'Norochan')),
+          h('span', { class: 'code', 'data-home-code': 'code' }, c.code || 'Norochan')),
         h('div', { class: 'promo-actions' },
           copyBtn,
-          h('a', { class: 'btn small', href: c.referralUrl || '/', target: '_blank', rel: 'noopener sponsored' }, 'Join now'),
+          h('a', { class: 'btn small', href: c.referralUrl || '/', target: '_blank', rel: 'noopener sponsored', 'data-home-join': 'join' }, 'Join now'),
           copyMsg)),
       h('section', { class: 'race-card' },
         decor('decor-race', [['trophy', 's-trophy'], ['hourglass', 's-glass'], ['star', 's-star']]),
         h('span', { class: 'eyebrow' }, 'Race window'),
-        h('h2', {}, race.title || 'Wager race'),
-        h('p', { class: 'muted' }, formatRaceWindow(race) || 'Dates publish with the race config.'),
-        race.startsAt ? countdownBox(race) : null,
+        h('h2', { 'data-home-race-title': 'title' }, race.title || 'Wager race'),
+        h('p', { class: 'muted', 'data-home-race-window': 'window' }, formatRaceWindow(race) || 'Dates publish with the race config.'),
+        h('div', { 'data-home-countdown': 'countdown' }, race.startsAt ? countdownBox(race) : null),
         h('a', { class: 'btn small secondary', href: '/leaderboard' }, 'View standings')));
     return h('div', { class: 'page-shell' },
       h('section', { class: 'hero-stage', 'data-spy': 'home' },
@@ -1396,7 +1430,7 @@
             h('span', { class: 'eyebrow' }, 'Community'),
             h('h2', {}, 'Official channels'),
             h('p', { class: 'muted' }, 'The places Norochan actually posts.'))),
-        h('div', { class: 'community-grid' }, links)),
+        h('div', { class: 'community-grid', 'data-home-links': 'links' }, links)),
       supportSection());
   }
 
@@ -2136,6 +2170,8 @@
   let routeGen = 0;
   let spyFrame = 0;
   const siteHeader = document.querySelector('.site-header');
+  let headerOffset = siteHeader ? siteHeader.offsetHeight : 72;
+  window.addEventListener('resize', () => { headerOffset = siteHeader ? siteHeader.offsetHeight : 72; }, { passive: true });
   const scrollBehavior = () => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth');
 
   function normalizePathname(pathname) {
@@ -2236,8 +2272,10 @@
   // The active link follows the home section crossing a line ~30% down the viewport.
   function updateScrollSpy() {
     spyFrame = 0;
-    if (siteHeader) siteHeader.classList.toggle('is-scrolled', window.scrollY > 8);
     const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const marks = currentView === 'home' ? [...app.querySelectorAll('[data-spy]')] : [];
+    const tops = marks.map((el) => el.getBoundingClientRect().top);
+    if (siteHeader) siteHeader.classList.toggle('is-scrolled', window.scrollY > 8);
     progressBar.style.transform = 'scaleX(' + (maxScroll > 0 ? Math.min(1, window.scrollY / maxScroll) : 0).toFixed(4) + ')';
     if (currentView !== 'home') return;
     const pinned = currentRouteName();
@@ -2245,11 +2283,10 @@
       setActiveNav(pinned);
       return;
     }
-    const marks = [...app.querySelectorAll('[data-spy]')];
     if (!marks.length) return;
-    const line = (siteHeader ? siteHeader.offsetHeight : 72) + window.innerHeight * 0.3;
+    const line = headerOffset + window.innerHeight * 0.3;
     let active = marks[0].dataset.spy;
-    for (const el of marks) if (el.getBoundingClientRect().top <= line) active = el.dataset.spy;
+    for (let i = 0; i < marks.length; i++) if (tops[i] <= line) active = marks[i].dataset.spy;
     const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
     if (atBottom) active = marks[marks.length - 1].dataset.spy;
     setActiveNav(active);
@@ -2407,19 +2444,35 @@
     catch { syncNavLive(null); }
   }
 
+  function applyLiveConfig() {
+    const c = state.config;
+    if (!c || currentView !== 'home') return;
+    const code = document.querySelector('[data-home-code]');
+    if (code) code.textContent = c.code || 'Norochan';
+    const join = document.querySelector('[data-home-join]');
+    if (join) join.href = c.referralUrl || '/';
+    const race = c.race || {};
+    const title = document.querySelector('[data-home-race-title]');
+    if (title) title.textContent = race.title || 'Wager race';
+    const raceWindow = document.querySelector('[data-home-race-window]');
+    if (raceWindow) raceWindow.textContent = formatRaceWindow(race) || 'Dates publish with the race config.';
+    const countdown = document.querySelector('[data-home-countdown]');
+    if (countdown) countdown.replaceChildren(race.startsAt ? countdownBox(race) : '');
+    const links = document.querySelector('[data-home-links]');
+    if (links) links.replaceChildren(...communityCards());
+  }
+
   async function init() {
     const rewardsP = api('/api/rewards').catch(() => null);
-    try { state.config = await api('/api/config'); }
-    catch {
-      app.replaceChildren(UI.errorState
-        ? UI.errorState('Could not load the site.', 'Refresh the page and try again.', () => location.reload())
-        : h('p', { class: 'note warn' }, 'Could not load the site. Refresh the page.'));
-      return;
-    }
-    document.title = state.config.name;
-    api('/api/me').then((me) => { state.me = me; paintNavAccount(me); }).catch(() => paintNavAccount(null));
     window.addEventListener('popstate', () => { route(); });
+    const configP = api('/api/config');
     route();
+    configP.then((config) => {
+      state.config = config;
+      if (config && config.name) document.title = config.name;
+      applyLiveConfig();
+    }).catch(() => {});
+    api('/api/me').then((me) => { state.me = me; paintNavAccount(me); }).catch(() => paintNavAccount(null));
     rewardsP.then((rewards) => {
       state.rewards = rewards;
       const bonuses = document.getElementById('bonuses');

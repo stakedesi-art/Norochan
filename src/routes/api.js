@@ -13,6 +13,7 @@ const { publicWheel } = require('../services/wheel');
 const { handleAdmin } = require('./admin');
 const { handleAccount, authPublic } = require('./account');
 const accounts = require('../services/accounts');
+const shortCache = (seconds) => ({ 'Cache-Control': 'public, max-age=' + seconds });
 
 const isRealLink = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
 
@@ -45,15 +46,15 @@ async function handleApi(req, res, url) {
       prizes: publicRacePrizes(),
       race: { title: CONFIG.race.title, startsAt: CONFIG.race.startsAt, endsAt: CONFIG.race.endsAt, top: CONFIG.race.top },
       auth: authPublic(),
-    });
+    }, shortCache(60));
   }
 
   if (route === 'GET /api/rewards') {
-    return sendJson(res, 200, publicRewards());
+    return sendJson(res, 200, publicRewards(), shortCache(60));
   }
 
   if (route === 'GET /api/feed') {
-    return sendJson(res, 200, publicFeed());
+    return sendJson(res, 200, publicFeed(), shortCache(60));
   }
 
   if (route === 'GET /api/bonus-hunts') {
@@ -94,11 +95,11 @@ async function handleApi(req, res, url) {
   }
 
   if (route === 'GET /api/winners') {
-    return sendJson(res, 200, hunts.publicWinners());
+    return sendJson(res, 200, hunts.publicWinners(), shortCache(60));
   }
 
   if (route === 'GET /api/wheel') {
-    return sendJson(res, 200, publicWheel());
+    return sendJson(res, 200, publicWheel(), shortCache(30));
   }
   if (url.pathname === '/api/wheel' && req.method !== 'GET' && req.method !== 'HEAD') {
     return sendJson(res, 405, { error: 'Method not allowed.' }, { Allow: 'GET, HEAD' });
@@ -120,13 +121,13 @@ async function handleApi(req, res, url) {
         entries: [],
       });
     }
-    return sendJson(res, 200, { available: true, prizePool: publicRewards().viewerPrizePool, ...botrix.publicPeriod(botrix.ensureStore(storage.db), period, viewerRewardFor) });
+    return sendJson(res, 200, { available: true, prizePool: publicRewards().viewerPrizePool, ...botrix.publicPeriod(botrix.ensureStore(storage.db), period, viewerRewardFor) }, shortCache(30));
   }
 
   if (route === 'GET /api/kick-live') {
     try {
       const payload = await fetchKickChannelStatus(KICK_CHANNEL);
-      return sendJson(res, 200, payload);
+      return sendJson(res, 200, payload, shortCache(15));
     } catch (err) {
       return sendJson(res, 200, {
         status: 'unavailable',

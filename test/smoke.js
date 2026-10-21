@@ -120,6 +120,10 @@ async function main() {
     check('Kick live payload has the fields the live card uses', ['status', 'channel', 'title', 'viewers', 'thumbnail', 'url'].every((k) => k in kickLive.json));
     const home = record(await call('GET', '/'));
     check('home page served with CSP header', home.status === 200 && /<title>Norochan/.test(home.text) && !!home.headers.get('content-security-policy'));
+    check('home styles are one versioned stylesheet', /\/css\/site\.css\?v=/.test(home.text) && !/href="\/style\.css"/.test(home.text) && !/href="\/css\/identity\.css"/.test(home.text));
+    const siteCss = await call('GET', '/css/site.css?v=perf');
+    check('bundled stylesheet is cacheable for a year', siteCss.status === 200 && /font-family: "Fredoka"/.test(siteCss.text) && /body\.is-home::before/.test(siteCss.text) && /max-age=31536000/.test(String(siteCss.headers.get('cache-control') || '')));
+    check('public config can be cached briefly and the leaderboard cannot', /max-age=60/.test(String(cfg.headers.get('cache-control') || '')) && /no-store/.test(String((await call('GET', '/api/leaderboard')).headers.get('cache-control') || '')) && /no-store/.test(String((await call('GET', '/api/me')).headers.get('cache-control') || '')));
     check('public HTML uses clean nav hrefs', /href="\/leaderboard"/.test(home.text) && /href="\/code-benefits"/.test(home.text) && /href="\/account"/.test(home.text) && !/href="\/announcement"/.test(home.text) && !/href="#\/leaderboard"/.test(home.text) && /id="age-gate"/.test(home.text) && /\/age\.js/.test(home.text) && /Yes, I am 18 or older/.test(home.text));
     for (const p of ['/leaderboard', '/viewers', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/community', '/support', '/account']) {
       const page = record(await call('GET', p));
@@ -154,6 +158,7 @@ async function main() {
     check('public home shows the bonus total under the Norochan intro', /Total given so far/.test(appJs.text) && /leaderboardPayout/.test(appJs.text) && /levelUpBonus/.test(appJs.text) && /socialMediaGiveaways/.test(appJs.text) && homeSrc.indexOf('hero-welcome-by') < homeSrc.indexOf('bonusesGivenSection()') && homeSrc.indexOf('bonusesGivenSection()') < homeSrc.indexOf("id: 'streams'"));
     check('public home shows monthly leaderboard before Kick top viewers', homeSrc.indexOf('leaderboardPreview()') !== -1 && homeSrc.indexOf("id: 'top-viewers'") !== -1 && homeSrc.indexOf('leaderboardPreview()') < homeSrc.indexOf("id: 'top-viewers'"));
     check('home Kick viewers shows the top 3 and links to the full board', /kickTopViewersSection\(\{ compact: true \}\)/.test(homeSrc) && /href: '\/viewers'/.test(appJs.text) && /View full leaderboard/.test(appJs.text) && /viewerList\(data, compact \? 3 : 0\)/.test(appJs.text));
+    check('home paints before config returns', /const configP = api\('\/api\/config'\);\s*route\(\);/.test(appJs.text));
     check('old admin bundle is gone', (await call('GET', '/admin.js')).status === 404 && (await call('GET', '/css/admin.css')).status === 404);
     const studioPage = record(await call('GET', '/studio.html'));
     check('staff studio page is served off the public nav', studioPage.status === 200 && /Norochan studio/.test(studioPage.text) && /noindex/.test(studioPage.text));

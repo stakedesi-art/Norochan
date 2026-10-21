@@ -1155,11 +1155,35 @@ html { font-synthesis: weight none; }
 }
 
 body.is-home {
+  background-image: radial-gradient(circle at 50% 18%, rgba(0, 229, 255, 0.16), transparent 58%);
+  background-size: 100% 100%;
+}
+body.is-home::before {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  left: -40px;
+  top: -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(52, 211, 234, 0.05) 1px, transparent 1px),
+    linear-gradient(to right, rgba(52, 211, 234, 0.05) 1px, transparent 1px);
+  background-size: 30px 30px, 30px 30px;
   animation: home-grid-drift 28s linear infinite;
 }
+:root[data-theme="light"] body.is-home {
+  background-image: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.12), transparent 55%);
+}
+:root[data-theme="light"] body.is-home::before {
+  background-image:
+    linear-gradient(rgba(8, 145, 178, 0.06) 1px, transparent 1px),
+    linear-gradient(to right, rgba(8, 145, 178, 0.06) 1px, transparent 1px);
+}
 @keyframes home-grid-drift {
-  from { background-position: 50% 18%, 0 0, 0 0; }
-  to { background-position: 50% 18%, 30px 30px, 30px 30px; }
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(30px, 30px, 0); }
 }
 
 .page-shell .hero-copy.reveal,
@@ -1198,39 +1222,34 @@ body.is-home {
   animation: home-rise 800ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
 }
 .page-shell .hero-welcome h1 {
-  animation:
-    home-rise 800ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both,
-    home-neon 2.8s ease-in-out 900ms infinite;
+  animation: home-rise 800ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+  text-shadow: 0 0 22px rgba(0, 229, 255, 0.55);
 }
 .page-shell .hero-welcome-by {
   animation: home-rise 800ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
 }
-.page-shell .promo-code-box {
-  animation: home-code-glow 2.8s ease-in-out 1.2s infinite;
-}
+.page-shell .promo-code-box,
 .page-shell .promo-actions .btn:not(.secondary):not(.ghost):not(.outline) {
-  animation: home-cta-pulse 2.6s ease-in-out 1.4s infinite;
+  position: relative;
+}
+.page-shell .promo-code-box::after,
+.page-shell .promo-actions .btn:not(.secondary):not(.ghost):not(.outline)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 28px rgba(0, 229, 255, 0.55);
+  animation: home-glow-fade 2.8s ease-in-out 1.2s infinite;
 }
 
 @keyframes home-rise {
   from { opacity: 0; transform: translateY(18px); }
   to { opacity: 1; transform: none; }
 }
-@keyframes home-neon {
-  0%, 100% { text-shadow: 0 0 16px rgba(0, 229, 255, 0.3), 0 0 36px rgba(0, 229, 255, 0.12); }
-  50% { text-shadow: 0 0 28px rgba(0, 229, 255, 0.8), 0 0 70px rgba(0, 229, 255, 0.38); }
-}
-@keyframes home-cta-pulse {
-  0%, 100% { box-shadow: 0 0 18px rgba(0, 229, 255, 0.32); }
-  50% { box-shadow: 0 0 34px rgba(0, 229, 255, 0.72); }
-}
-@keyframes home-stat-glow {
-  0%, 100% { text-shadow: 0 0 12px rgba(0, 229, 255, 0.25); }
-  50% { text-shadow: 0 0 28px rgba(0, 229, 255, 0.7); }
-}
-@keyframes home-code-glow {
-  0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 18px rgba(0, 229, 255, 0.12); border-color: rgba(0, 229, 255, 0.35); }
-  50% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 36px rgba(0, 229, 255, 0.4); border-color: rgba(0, 229, 255, 0.75); }
+@keyframes home-glow-fade {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
 }
 
 .norochan-money-rain {
@@ -1365,13 +1384,14 @@ body.is-home {
 
 @media (prefers-reduced-motion: reduce) {
   body.is-home,
+  body.is-home::before,
   .page-shell .hero-stage::after,
   .page-shell .hero-welcome-kicker,
   .page-shell .hero-welcome-collab,
   .page-shell .hero-welcome h1,
   .page-shell .hero-welcome-by,
-  .page-shell .promo-code-box,
-  .page-shell .promo-actions .btn:not(.secondary):not(.ghost):not(.outline) {
+  .page-shell .promo-code-box::after,
+  .page-shell .promo-actions .btn:not(.secondary):not(.ghost):not(.outline)::after {
     animation: none;
   }
   .page-shell .hero-welcome h1 { text-shadow: 0 0 28px rgba(0, 229, 255, 0.4); }
