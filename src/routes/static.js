@@ -11,7 +11,7 @@ const TYPES = {
   '.woff2': 'font/woff2',
 };
 const SPA_PATHS = new Set([
-  '/', '/leaderboard', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/benefits',
+  '/', '/leaderboard', '/viewers', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/benefits',
   '/community', '/support', '/account',
 ]);
 const INDEX = path.join(PUBLIC_DIR, 'index.html');

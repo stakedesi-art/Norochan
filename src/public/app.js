@@ -1072,13 +1072,14 @@
     return board;
   }
 
-  function viewerList(data) {
+  function viewerList(data, limit) {
+    const entries = limit ? data.entries.slice(0, limit) : data.entries;
     const list = h('div', { class: 'leaderboard-list viewer-list', role: 'list' });
     list.append(h('div', { class: 'leaderboard-row leaderboard-head', role: 'presentation' },
       h('span', {}, 'Rank'),
       h('span', {}, 'Viewer'),
       h('span', { class: 'num' }, data.watchTimeAvailable ? 'Watch time' : 'Points')));
-    for (const e of data.entries) {
+    for (const e of entries) {
       const m = viewerMetrics(e, data);
       list.append(h('div', {
         class: ['leaderboard-row', e.rank <= 3 ? 'top3 rank-' + e.rank : ''].filter(Boolean).join(' '),
@@ -1088,13 +1089,14 @@
       h('div', { class: 'leaderboard-player' }, viewerAvatar(e), h('span', { class: 'leaderboard-name' }, e.username)),
       h('div', { class: 'leaderboard-stats' },
         h('span', { class: 'leaderboard-wagered' }, m.primary),
-        m.secondary ? h('span', { class: 'leaderboard-prize' }, m.secondary) : null)));
+        !limit && m.secondary ? h('span', { class: 'leaderboard-prize' }, m.secondary) : null)));
     }
     return list;
   }
 
-  function kickTopViewersSection() {
-    const panel = h('section', { class: 'board-card viewer-board', 'aria-labelledby': 'kick-viewers-heading' });
+  function kickTopViewersSection(opts = {}) {
+    const compact = !!opts.compact;
+    const panel = h('section', { class: 'board-card viewer-board' + (compact ? ' viewer-board-compact' : ''), 'aria-labelledby': 'kick-viewers-heading' });
     const body = h('div', { 'aria-live': 'polite' });
     const cache = {};
     let period = 'current';
@@ -1124,12 +1126,12 @@
       if (label) meta.push(label);
       if (data.updatedAt) meta.push('Updated ' + (data.stale ? formatUpdatedAgo(data.updatedAt) : formatUpdated(data.updatedAt)));
       body.replaceChildren(...[
-        h('p', { class: 'leaderboard-rule' }, meta.filter(Boolean).join(' · ')),
-        viewerPodium(data),
-        viewerList(data),
+        compact ? null : h('p', { class: 'leaderboard-rule' }, meta.filter(Boolean).join(' · ')),
+        compact ? null : viewerPodium(data),
+        viewerList(data, compact ? 3 : 0),
         data.stale ? h('p', { class: 'note warn' }, 'Showing last available BotRix data') : null,
-        data.stale && data.updatedAt ? h('p', { class: 'muted' }, 'Updated ' + formatUpdatedAgo(data.updatedAt)) : null,
-        h('p', { class: 'muted hint' }, 'Ranked by watch time from BotRix. Points are secondary.'),
+        !compact && data.stale && data.updatedAt ? h('p', { class: 'muted' }, 'Updated ' + formatUpdatedAgo(data.updatedAt)) : null,
+        compact ? null : h('p', { class: 'muted hint' }, 'Ranked by watch time from BotRix. Points are secondary.'),
       ].filter(Boolean));
     }
 
@@ -1137,7 +1139,7 @@
       const mine = ++request;
       const wanted = period;
       if (cache[wanted]) { render(cache[wanted]); return; }
-      body.replaceChildren(listSkeleton(3));
+      body.replaceChildren(listSkeleton(compact ? 3 : 6));
       try {
         const res = await fetch('/api/viewers/' + wanted);
         const data = await res.json().catch(() => null);
@@ -1160,7 +1162,10 @@
               : 'Watch time on Kick, tracked by BotRix';
           })())),
         monthTabs('kick-viewers', 'Viewer month', (next) => { period = next; load(); })),
-      body
+      body,
+      compact
+        ? h('div', { class: 'board-foot' }, h('a', { class: 'btn small secondary', href: '/viewers' }, 'View full leaderboard'))
+        : null
     );
     load();
     stopViewerPoll();
@@ -1382,7 +1387,7 @@
             h('p', { class: 'muted' }, 'Live status from the channel. Viewer counts appear only while the stream is live.'))),
         kickLivePreview()),
       leaderboardPreview(),
-      h('section', { id: 'top-viewers', class: 'section-block', 'data-spy': 'streams' }, kickTopViewersSection()),
+      h('section', { id: 'top-viewers', class: 'section-block', 'data-spy': 'streams' }, kickTopViewersSection({ compact: true })),
       wheelStrip(),
       h('section', { id: 'benefits', class: 'section-block', 'data-spy': 'benefits' }, feed.benefits),
       h('section', { id: 'community', class: 'section-block', 'data-spy': 'community' },
@@ -2092,11 +2097,16 @@
     paint();
   }
 
-  const pageNames = { home: 'Home', leaderboard: 'Leaderboard', support: 'Support', wheel: 'Wheel', hunts: 'Bonus hunts', winners: 'Winners', benefits: 'Code benefits', streams: 'Streams', community: 'Community', account: 'Account' };
+  function viewersView() {
+    return h('div', { class: 'page-shell viewers-page' }, kickTopViewersSection());
+  }
+
+  const pageNames = { home: 'Home', leaderboard: 'Leaderboard', viewers: 'Kick viewers', support: 'Support', wheel: 'Wheel', hunts: 'Bonus hunts', winners: 'Winners', benefits: 'Code benefits', streams: 'Streams', community: 'Community', account: 'Account' };
   const homeSections = { wheel: 'wheel', benefits: 'benefits', streams: 'streams', community: 'community', support: 'support' };
   const ROUTE_PATH = {
     home: '/',
     leaderboard: '/leaderboard',
+    viewers: '/viewers',
     wheel: '/wheel',
     hunts: '/bonus-hunts',
     winners: '/winners',
@@ -2110,6 +2120,7 @@
     '': 'home',
     '/': 'home',
     leaderboard: 'leaderboard',
+    viewers: 'viewers',
     wheel: 'wheel',
     'bonus-hunts': 'hunts',
     winners: 'winners',
@@ -2329,10 +2340,11 @@
     if (name !== 'streams' && canonical && normalizePathname(location.pathname) !== canonical) {
       history.replaceState(null, '', canonical + location.search);
     }
-    setActiveNav(section || (['leaderboard', 'account', 'hunts', 'winners'].includes(name) ? name : 'home'));
+    setActiveNav(section || (['leaderboard', 'viewers', 'account', 'hunts', 'winners'].includes(name) ? name : 'home'));
     const announcer = document.getElementById('route-announcer');
     if (announcer) announcer.textContent = pageNames[name] || pageNames.home;
     if (name === 'leaderboard') { currentView = 'leaderboard'; await leaderboardView(); }
+    else if (name === 'viewers') { currentView = 'viewers'; app.replaceChildren(viewersView()); }
     else if (name === 'account') { currentView = 'account'; app.replaceChildren(accountView()); }
     else if (name === 'hunts') { currentView = 'hunts'; await huntsView(); }
     else if (name === 'winners') { currentView = 'winners'; await winnersView(); }

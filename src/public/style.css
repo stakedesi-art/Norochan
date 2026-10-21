@@ -961,6 +961,21 @@ p { margin: 0 0 var(--space-3); }
 .viewer-podium .rank-1 .podium-avatar .avatar { width: 64px; height: 64px; box-shadow: 0 0 0 2px var(--gold), 0 0 22px rgba(246, 196, 69, 0.35); }
 .viewer-podium .rank-2 .podium-avatar .avatar { box-shadow: 0 0 0 2px var(--silver); }
 .viewer-podium .rank-3 .podium-avatar .avatar { box-shadow: 0 0 0 2px var(--bronze); }
+.viewer-board-compact { padding: var(--space-4) var(--space-4) var(--space-3); }
+.viewer-board-compact .board-card-head { margin-bottom: var(--space-2); }
+.viewer-board-compact .leaderboard-row { padding: 7px 10px; gap: 8px; }
+.viewer-board-compact .leaderboard-row .avatar,
+.viewer-board-compact .leaderboard-row.rank-1 .avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.72rem;
+  border-radius: 8px;
+}
+.viewer-board-compact .rank-num,
+.viewer-board-compact .leaderboard-name,
+.viewer-board-compact .leaderboard-wagered { font-size: 0.88rem; }
+.viewer-board-compact .board-foot { margin-top: var(--space-2); }
+.viewers-page { gap: var(--space-5); }
 .viewer-board .hint { margin: var(--space-4) 0 0; font-size: var(--text-caption); }
 .viewer-board .leaderboard-rule { margin-bottom: var(--space-4); }
 @media (max-width: 480px) {

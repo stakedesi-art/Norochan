@@ -121,7 +121,7 @@ async function main() {
     const home = record(await call('GET', '/'));
     check('home page served with CSP header', home.status === 200 && /<title>Norochan/.test(home.text) && !!home.headers.get('content-security-policy'));
     check('public HTML uses clean nav hrefs', /href="\/leaderboard"/.test(home.text) && /href="\/code-benefits"/.test(home.text) && /href="\/account"/.test(home.text) && !/href="\/announcement"/.test(home.text) && !/href="#\/leaderboard"/.test(home.text) && /id="age-gate"/.test(home.text) && /\/age\.js/.test(home.text) && /Yes, I am 18 or older/.test(home.text));
-    for (const p of ['/leaderboard', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/community', '/support', '/account']) {
+    for (const p of ['/leaderboard', '/viewers', '/wheel', '/bonus-hunts', '/winners', '/code-benefits', '/community', '/support', '/account']) {
       const page = record(await call('GET', p));
       check('SPA ' + p + ' serves the app HTML', page.status === 200 && /<title>Norochan/.test(page.text) && /\/app\.js/.test(page.text) && /text\/html/.test(String(page.headers.get('content-type') || '')));
     }
@@ -140,7 +140,7 @@ async function main() {
     check('public app uses History API path routing', /addEventListener\('popstate'/.test(appJs.text) && /history\.pushState/.test(appJs.text) && !/consumeLegacyHash/.test(appJs.text) && !/addEventListener\('hashchange'/.test(appJs.text) && !/location\.hash/.test(appJs.text) && /noro-age/.test(appJs.text) && /showModal/.test(appJs.text));
     check('public feed is wired', /\/api\/feed/.test(appJs.text));
     check('public wheel is a live canvas fed by /api/wheel, not hardcoded players', /\/api\/wheel/.test(appJs.text) && /getContext/.test(appJs.text) && /Live draw/.test(appJs.text) && /wheel-countdown/.test(appJs.text) && /strokeText\(label/.test(appJs.text) && !/Alice_W|bobby99|KaiTheGreat/.test(appJs.text) && !/ticketsFromWager/.test(appJs.text));
-    check('viewer board keeps podium animation and never fetches BotRix from the browser', /viewerPodium/.test(appJs.text) && /\/api\/viewers\//.test(appJs.text) && /listSkeleton\(3\)/.test(appJs.text) && !/botrix\.live/.test(appJs.text) && !/BOTRIX_API_KEY|BOTRIX_KEY/.test(appJs.text));
+    check('viewer board keeps podium animation and never fetches BotRix from the browser', /viewerPodium/.test(appJs.text) && /\/api\/viewers\//.test(appJs.text) && /listSkeleton\(compact \? 3 : 6\)/.test(appJs.text) && !/botrix\.live/.test(appJs.text) && !/BOTRIX_API_KEY|BOTRIX_KEY/.test(appJs.text));
     check('leaderboard UI can mark the signed-in row as (you)', /you-tag/.test(appJs.text) && /\(you\)/.test(appJs.text));
     check('browser never calls Stake or carries the affiliate token', !/api\.stake\.(jp|com)/.test(appJs.text) && !/STAKE_TOKEN|x-access-token/.test(appJs.text) && /\/api\/leaderboard/.test(appJs.text));
     const stakeSrc = fs.readFileSync(path.join(root, 'src/services/stake.js'), 'utf8');
@@ -153,6 +153,7 @@ async function main() {
     const homeSrc = appJs.text.slice(appJs.text.indexOf('function homeView()'));
     check('public home shows the bonus total under the Norochan intro', /Total given so far/.test(appJs.text) && /leaderboardPayout/.test(appJs.text) && /levelUpBonus/.test(appJs.text) && /socialMediaGiveaways/.test(appJs.text) && homeSrc.indexOf('hero-welcome-by') < homeSrc.indexOf('bonusesGivenSection()') && homeSrc.indexOf('bonusesGivenSection()') < homeSrc.indexOf("id: 'streams'"));
     check('public home shows monthly leaderboard before Kick top viewers', homeSrc.indexOf('leaderboardPreview()') !== -1 && homeSrc.indexOf("id: 'top-viewers'") !== -1 && homeSrc.indexOf('leaderboardPreview()') < homeSrc.indexOf("id: 'top-viewers'"));
+    check('home Kick viewers shows the top 3 and links to the full board', /kickTopViewersSection\(\{ compact: true \}\)/.test(homeSrc) && /href: '\/viewers'/.test(appJs.text) && /View full leaderboard/.test(appJs.text) && /viewerList\(data, compact \? 3 : 0\)/.test(appJs.text));
     check('old admin bundle is gone', (await call('GET', '/admin.js')).status === 404 && (await call('GET', '/css/admin.css')).status === 404);
     const studioPage = record(await call('GET', '/studio.html'));
     check('staff studio page is served off the public nav', studioPage.status === 200 && /Norochan studio/.test(studioPage.text) && /noindex/.test(studioPage.text));
