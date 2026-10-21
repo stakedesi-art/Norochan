@@ -151,6 +151,8 @@ async function main() {
     check('Account chip uses the Stake username and first letter', /paintNavAccount/.test(appJs.text) && /nav-account-mark/.test(appJs.text) && /stakeUser/.test(appJs.text));
     check('public home does not render the prize-place rewards grid', !/reward-grid/.test(appJs.text) && !/Place ' \+ String\(rank\)/.test(appJs.text) && !/rewardFiller/.test(appJs.text));
     check('public home shows bonuses given so far after Community', /Bonuses given so far/.test(appJs.text) && /leaderboardPayout/.test(appJs.text) && /levelUpBonus/.test(appJs.text) && /socialMediaGiveaways/.test(appJs.text) && appJs.text.indexOf("id: 'community'") < appJs.text.indexOf('bonusesGivenSection()') && appJs.text.indexOf('bonusesGivenSection()') < appJs.text.indexOf('supportSection()'));
+    const homeSrc = appJs.text.slice(appJs.text.indexOf('function homeView()'));
+    check('public home shows monthly leaderboard before Kick top viewers', homeSrc.indexOf('leaderboardPreview()') !== -1 && homeSrc.indexOf("id: 'top-viewers'") !== -1 && homeSrc.indexOf('leaderboardPreview()') < homeSrc.indexOf("id: 'top-viewers'"));
     check('old admin bundle is gone', (await call('GET', '/admin.js')).status === 404 && (await call('GET', '/css/admin.css')).status === 404);
     const studioPage = record(await call('GET', '/studio.html'));
     check('staff studio page is served off the public nav', studioPage.status === 200 && /Norochan studio/.test(studioPage.text) && /noindex/.test(studioPage.text));
